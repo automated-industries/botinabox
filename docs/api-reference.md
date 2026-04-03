@@ -670,6 +670,44 @@ function toolLoop(
 ): AsyncGenerator<{ type: 'text'; content: string } | { type: 'tool_use'; name: string; input: unknown } | { type: 'done'; result: ChatResult }>;
 ```
 
+### UserRegistry (v0.2.0+)
+
+```typescript
+import { UserRegistry } from 'botinabox';
+
+class UserRegistry {
+  constructor(db: DataStore, hooks: HookBus);
+  register(input: UserInput): Promise<User>;
+  getById(id: string): Promise<User | null>;
+  getByEmail(email: string): Promise<User | null>;
+  resolveByIdentity(channel: string, externalId: string): Promise<User | null>;
+  resolveOrCreate(externalId: string, channel: string, defaults?: Partial<UserInput>): Promise<User>;
+  list(filter?: { role?: string; org_id?: string }): Promise<User[]>;
+  update(id: string, changes: Partial<UserInput>): Promise<void>;
+  addIdentity(userId: string, channel: string, externalId: string, displayName?: string): Promise<void>;
+}
+```
+
+Users are **protected objects** — their context is never auto-rendered into other entities' files. Use `resolveOrCreate()` in the message pipeline to auto-create users from channel peer IDs.
+
+### SecretStore (v0.2.0+)
+
+```typescript
+import { SecretStore } from 'botinabox';
+
+class SecretStore {
+  constructor(db: DataStore, hooks: HookBus);
+  set(input: SecretInput): Promise<SecretMeta>;
+  get(name: string, environment?: string): Promise<string | null>;  // decrypted value
+  getMeta(name: string, environment?: string): Promise<SecretMeta | null>;
+  list(): Promise<SecretMeta[]>;  // metadata only, no values
+  rotate(name: string, newValue: string, environment?: string): Promise<void>;
+  delete(name: string, environment?: string): Promise<void>;
+}
+```
+
+Secrets are **protected objects** with optional at-rest encryption. When Lattice's `encryptionKey` is configured, secret values are transparently encrypted on write and decrypted on read. Use `get()` for the decrypted value, `getMeta()` for metadata only.
+
 ### Security
 
 ```typescript
