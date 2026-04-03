@@ -1,7 +1,7 @@
 import type { DataStore } from "./data-store.js";
 
 /**
- * Define all 15 core tables on a DataStore instance.
+ * Define all 18 core tables on a DataStore instance.
  * Call before db.init().
  */
 export function defineCoreTables(db: DataStore): void {
@@ -105,6 +105,7 @@ export function defineCoreTables(db: DataStore): void {
       agent_id: "TEXT NOT NULL",
       channel: "TEXT NOT NULL",
       peer_id: "TEXT NOT NULL",
+      user_id: "TEXT",
       last_message_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       message_count: "INTEGER NOT NULL DEFAULT 0",
       context: "TEXT NOT NULL DEFAULT '{}'",
@@ -254,5 +255,68 @@ export function defineCoreTables(db: DataStore): void {
       applied_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       rolled_back_at: "TEXT",
     },
+  });
+
+  // --- Protected primitives (v0.2.0) ---
+
+  db.define("users", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      org_id: "TEXT",
+      name: "TEXT NOT NULL",
+      email: "TEXT",
+      role: "TEXT",
+      title: "TEXT",
+      external_id: "TEXT",
+      channel: "TEXT",
+      timezone: "TEXT",
+      preferences: "TEXT NOT NULL DEFAULT '{}'",
+      notes: "TEXT",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      deleted_at: "TEXT",
+    },
+    tableConstraints: [
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL AND deleted_at IS NULL",
+      "CREATE INDEX IF NOT EXISTS idx_users_external_id ON users(external_id) WHERE deleted_at IS NULL",
+    ],
+  });
+
+  db.define("user_identities", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      user_id: "TEXT NOT NULL",
+      channel: "TEXT NOT NULL",
+      external_id: "TEXT NOT NULL",
+      display_name: "TEXT",
+      verified: "INTEGER NOT NULL DEFAULT 0",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    },
+    tableConstraints: [
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identities_channel_ext ON user_identities(channel, external_id)",
+      "FOREIGN KEY (user_id) REFERENCES users(id)",
+    ],
+  });
+
+  db.define("secrets", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      org_id: "TEXT",
+      name: "TEXT NOT NULL",
+      type: "TEXT NOT NULL DEFAULT 'api_key'",
+      environment: "TEXT NOT NULL DEFAULT 'production'",
+      value: "TEXT",
+      location: "TEXT",
+      description: "TEXT",
+      rotation_schedule: "TEXT",
+      expires_at: "TEXT",
+      notes: "TEXT",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      deleted_at: "TEXT",
+    },
+    tableConstraints: [
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_secrets_name_env ON secrets(name, environment, org_id) WHERE deleted_at IS NULL",
+    ],
   });
 }

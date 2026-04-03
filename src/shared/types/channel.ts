@@ -24,7 +24,8 @@ export interface InboundMessage {
   id: string;
   channel: string;
   account?: string;
-  from: string;             // Peer/user ID
+  from: string;             // Raw peer ID from channel (e.g. Slack user ID)
+  userId?: string;          // Resolved botinabox user ID (set by pipeline)
   body: string;
   threadId?: string;
   replyToId?: string;

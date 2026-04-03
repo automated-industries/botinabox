@@ -31,3 +31,5 @@ export * from "./core/orchestrator/dependency-resolver.js";
 export * from "./core/orchestrator/template-interpolate.js";
 export * from "./core/orchestrator/adapters/api-adapter.js";
 export * from "./core/orchestrator/adapters/cli-adapter.js";
+export * from "./core/orchestrator/user-registry.js";
+export * from "./core/orchestrator/secret-store.js";
