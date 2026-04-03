@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@botinabox/shared": "workspace:*",
-    "latticesql": "^0.16.2",
+    "latticesql": "^0.17.0",
     "yaml": "^2.7.0",
     "ajv": "^8.17.1"
   },

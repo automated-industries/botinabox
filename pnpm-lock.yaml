@@ -111,8 +111,8 @@ importers:
         specifier: ^8.17.1
         version: 8.18.0
       latticesql:
-        specifier: ^0.16.2
-        version: 0.16.2
+        specifier: ^0.17.0
+        version: 0.17.0
       yaml:
         specifier: ^2.7.0
         version: 2.8.3
@@ -827,8 +827,8 @@ packages:
   json-schema-traverse@1.0.0:
     resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
 
-  latticesql@0.16.2:
-    resolution: {integrity: sha512-hcS4yEGDyeeMQrJteqaQuDrqKboDaUuaE4E3Oy1fKzZtHPHJnrgHy7Mm1tJEx09jaoVz3E3KxDc+aqTejvMtqg==}
+  latticesql@0.17.0:
+    resolution: {integrity: sha512-WqGNig62WwcDLmCCFv1fZcZT58OmurzhcefMyamTHIHRo1rl7FfnnwjutXxjxhSjuPyV/zb0Plf3UK6sA6yceA==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1723,7 +1723,7 @@ snapshots:
 
   json-schema-traverse@1.0.0: {}
 
-  latticesql@0.16.2:
+  latticesql@0.17.0:
     dependencies:
       better-sqlite3: 12.8.0
       uuid: 13.0.0

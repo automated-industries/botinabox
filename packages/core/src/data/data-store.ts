@@ -57,21 +57,14 @@ export class DataStore {
       }
     }
 
-    // Lattice doesn't support composite primaryKey arrays — convert to table constraint
-    let primaryKey = def.primaryKey;
-    if (Array.isArray(primaryKey)) {
-      inlineConstraints.unshift(`PRIMARY KEY (${primaryKey.join(', ')})`);
-      primaryKey = undefined;
-    }
-
     this.lattice.define(name, {
       columns: def.columns,
-      primaryKey: primaryKey as string | undefined,
+      primaryKey: def.primaryKey,
       tableConstraints: inlineConstraints.length ? inlineConstraints : undefined,
       relations: def.relations as Record<string, import('latticesql').Relation> | undefined,
-      render: def.render ?? (() => ''),
-      outputFile: def.outputFile ?? `.internal/${name}.md`,
       filter: def.filter,
+      render: def.render,
+      outputFile: def.outputFile,
     });
   }
 
@@ -107,17 +100,9 @@ export class DataStore {
 
   // --- CRUD -----------------------------------------------------------
 
-  /**
-   * Insert a row. Returns the full inserted row (including auto-generated id).
-   *
-   * NOTE: Lattice returns only the pk string. We do a follow-up get() to return
-   * the full row. This is flagged as a Lattice gap (insertReturning).
-   */
   async insert(table: string, row: Row): Promise<Row> {
     this.assertInitialized();
-    const id = await this.lattice.insert(table, row);
-    const inserted = await this.lattice.get(table, id);
-    return inserted ?? { ...row, id };
+    return this.lattice.insertReturning(table, row);
   }
 
   async upsert(table: string, row: Row): Promise<Row> {
@@ -127,17 +112,9 @@ export class DataStore {
     return result ?? { ...row, id };
   }
 
-  /**
-   * Update a row by primary key. Returns the updated row.
-   *
-   * NOTE: Lattice returns void. We do a follow-up get() to return the full
-   * row. This is flagged as a Lattice gap (updateReturning).
-   */
   async update(table: string, pk: PkLookup, changes: Row): Promise<Row> {
     this.assertInitialized();
-    await this.lattice.update(table, pk, changes);
-    const result = await this.lattice.get(table, pk);
-    return result ?? changes;
+    return this.lattice.updateReturning(table, pk, changes);
   }
 
   async delete(table: string, pk: PkLookup): Promise<void> {
@@ -179,41 +156,9 @@ export class DataStore {
 
   // --- Migrations -----------------------------------------------------
 
-  /**
-   * Run versioned migrations after init().
-   *
-   * NOTE: Lattice handles migrations via init({ migrations }). This method
-   * uses raw DB access as a workaround for post-init migrations (e.g.,
-   * package-level schema changes). Flagged as a Lattice gap.
-   */
-  /**
-   * Run versioned migrations after init().
-   *
-   * Uses a separate tracking table (__botinabox_migrations) because Lattice's
-   * __lattice_migrations uses INTEGER primary keys while botinabox uses string
-   * versions like "package:semver". Flagged as a Lattice gap.
-   */
   async migrate(migrations: Array<{ version: string; sql: string }>): Promise<void> {
     this.assertInitialized();
-    const db = this.lattice.db;
-
-    db.exec(
-      `CREATE TABLE IF NOT EXISTS __botinabox_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)`
-    );
-
-    const applied = new Set(
-      (db.prepare('SELECT version FROM __botinabox_migrations').all() as Array<{ version: string }>)
-        .map(r => r.version)
-    );
-
-    for (const m of migrations) {
-      if (applied.has(m.version)) continue;
-      db.exec(m.sql);
-      db.prepare('INSERT INTO __botinabox_migrations (version, applied_at) VALUES (?, ?)').run(
-        m.version,
-        new Date().toISOString()
-      );
-    }
+    await this.lattice.migrate(migrations);
   }
 
   // --- Seed -----------------------------------------------------------
@@ -258,10 +203,6 @@ export class DataStore {
 
   // --- Schema introspection ------------------------------------------
 
-  /**
-   * Get column info for a table (for ColumnValidator).
-   * Delegates to Lattice's raw SQLite connection.
-   */
   tableInfo(table: string): TableInfoRow[] {
     this.assertInitialized();
     return this.lattice.db.pragma(`table_info(${table})`) as TableInfoRow[];
@@ -274,10 +215,6 @@ export class DataStore {
     this._initialized = false;
   }
 
-  /**
-   * Register an application-level event handler on the HookBus.
-   * These events are emitted by orchestrator modules, not the data layer.
-   */
   on(event: string, handler: (context: Record<string, unknown>) => void): void {
     this.hooks?.register(event, handler);
   }
