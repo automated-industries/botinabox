@@ -84,7 +84,19 @@ export class DataStore {
       protected: def.protected,
       encrypted: def.encrypted,
       index: def.indexFile
-        ? { outputFile: def.indexFile, render: (rows: Row[]) => '' }
+        ? {
+            outputFile: def.indexFile,
+            render: def.indexRender ?? ((rows: Row[]) => {
+              const title = def.directory.charAt(0).toUpperCase() + def.directory.slice(1);
+              if (!rows.length) return `# ${title}\n\nNone.\n`;
+              const lines = rows.map((r) => {
+                const name = String(r.name ?? r[def.slugColumn] ?? r.id ?? 'unknown');
+                const status = r.status ? ` (${r.status})` : '';
+                return `- **${name}**${status}`;
+              });
+              return `# ${title}\n\n${lines.join('\n')}\n`;
+            }),
+          }
         : undefined,
     });
   }

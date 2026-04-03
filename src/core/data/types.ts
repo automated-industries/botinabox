@@ -21,6 +21,8 @@ export interface EntityContextDef {
   slugColumn: string;
   files: Record<string, EntityFileSpec>;
   indexFile?: string;
+  /** Custom index render function. If omitted, a default listing is generated. */
+  indexRender?: (rows: Row[]) => string;
   protectedFiles?: string[];
   /** When true, this entity's data is never rendered into other entities' context files. */
   protected?: boolean;
