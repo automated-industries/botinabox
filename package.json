@@ -1,6 +1,6 @@
 {
   "name": "botinabox",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Bot in a Box — framework for building multi-agent bots",
   "type": "module",
   "main": "./dist/index.js",
@@ -47,6 +47,7 @@
     "@types/uuid": "^10.0.0",
     "ajv": "^8.17.1",
     "latticesql": "^0.18.0",
+    "uuid": "^13.0.0",
     "yaml": "^2.7.0"
   },
   "peerDependencies": {
