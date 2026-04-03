@@ -83,13 +83,15 @@ export class DataStore {
       protectedFiles: def.protectedFiles,
       protected: def.protected,
       encrypted: def.encrypted,
+      sourceDefaults: { softDelete: true },
       index: def.indexFile
         ? {
             outputFile: def.indexFile,
             render: def.indexRender ?? ((rows: Row[]) => {
+              const active = rows.filter((r) => r.deleted_at == null);
               const title = def.directory.charAt(0).toUpperCase() + def.directory.slice(1);
-              if (!rows.length) return `# ${title}\n\nNone.\n`;
-              const lines = rows.map((r) => {
+              if (!active.length) return `# ${title}\n\nNone.\n`;
+              const lines = active.map((r) => {
                 const name = String(r.name ?? r[def.slugColumn] ?? r.id ?? 'unknown');
                 const status = r.status ? ` (${r.status})` : '';
                 return `- **${name}**${status}`;
