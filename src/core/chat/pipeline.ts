@@ -6,6 +6,7 @@
 import type { HookBus } from "../hooks/hook-bus.js";
 import type { AgentRegistry } from "../orchestrator/agent-registry.js";
 import type { TaskQueue } from "../orchestrator/task-queue.js";
+import type { UserRegistry } from "../orchestrator/user-registry.js";
 import type { BotConfig } from "../../shared/index.js";
 import type { InboundMessage } from "./types.js";
 import { buildAgentBindings } from "./routing.js";
@@ -13,14 +14,17 @@ import { checkAllowlist, checkMentionGate } from "./policies.js";
 
 export class MessagePipeline {
   private readonly agentBindings: Map<string, string>;
+  private readonly userRegistry?: UserRegistry;
 
   constructor(
     private readonly hooks: HookBus,
     private readonly agentRegistry: AgentRegistry,
     private readonly taskQueue: TaskQueue,
     private readonly config: BotConfig,
+    userRegistry?: UserRegistry,
   ) {
     this.agentBindings = buildAgentBindings(config.agents);
+    this.userRegistry = userRegistry;
   }
 
   /**
@@ -34,6 +38,12 @@ export class MessagePipeline {
   async processInbound(msg: InboundMessage): Promise<void> {
     await this.hooks.emit("message.inbound", { message: msg, channel: msg.channel });
 
+    // Resolve sender to a user record (auto-creates if UserRegistry is available)
+    if (this.userRegistry && !msg.userId) {
+      const user = await this.userRegistry.resolveOrCreate(msg.from, msg.channel);
+      msg.userId = user.id;
+    }
+
     const agentId = this.resolveAgent(msg);
 
     if (agentId !== undefined) {
@@ -43,7 +53,7 @@ export class MessagePipeline {
           title: `Message from ${msg.from} on ${msg.channel}`,
           description: msg.body,
           assignee_id: agentId,
-          context: JSON.stringify({ message: msg }),
+          context: JSON.stringify({ message: msg, userId: msg.userId }),
         });
       }
     }
@@ -52,6 +62,7 @@ export class MessagePipeline {
       message: msg,
       channel: msg.channel,
       agentId: agentId ?? null,
+      userId: msg.userId ?? null,
     });
   }
 

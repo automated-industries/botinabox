@@ -10,13 +10,7 @@ describe('ColumnValidator', () => {
   beforeEach(async () => {
     db = new DataStore({ dbPath: ':memory:' });
     defineCoreTables(db);
-    db.define('users', {
-      columns: {
-        id: 'TEXT PRIMARY KEY',
-        name: 'TEXT',
-        email: 'TEXT',
-      },
-    });
+    // users table is now part of core tables — no need to define separately
     await db.init();
     validator = new ColumnValidatorImpl(db);
   });
