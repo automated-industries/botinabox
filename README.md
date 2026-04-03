@@ -11,6 +11,7 @@ A modular TypeScript framework for building multi-agent bots with LLM orchestrat
 - **SQLite data layer** — Schema-driven tables, migrations, entity context rendering, and query builder. WAL mode for concurrent reads.
 - **Event-driven hooks** — Priority-ordered, filter-based event bus for decoupled inter-layer communication.
 - **Budget controls** — Per-agent and global cost tracking with warning thresholds and hard stops.
+- **Protected primitives** — Users and secrets are first-class, privacy-isolated objects. User identity resolution across channels. Secrets with optional AES-256-GCM at-rest encryption.
 - **Security** — Input sanitization, field length enforcement, audit logging, and HMAC webhook verification.
 - **Self-updating** — Built-in update checker with configurable policies and maintenance windows.
 
