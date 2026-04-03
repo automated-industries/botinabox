@@ -97,4 +97,52 @@ export function defineCoreEntityContexts(db: DataStore): void {
       },
     },
   });
+
+  // --- Messages ---
+  db.defineEntityContext("messages", {
+    table: "messages",
+    directory: "messages",
+    slugColumn: "id",
+    indexFile: "messages/MESSAGES.md",
+    indexRender: (rows: Row[]) => {
+      const active = rows.filter((r) => r.deleted_at == null);
+      if (!active.length) return "# Messages\n\nNo messages.\n";
+      const recent = active.slice(-100);
+      const lines = recent.map((r) => {
+        const dir = r.direction === "outbound" ? "→" : "←";
+        const who = (r.from_agent as string) ?? (r.from_user as string) ?? "unknown";
+        const time = ((r.created_at as string) ?? "").slice(0, 16);
+        const preview = ((r.body as string) ?? "").slice(0, 80);
+        return `- ${dir} **${who}** (${time}): ${preview}`;
+      });
+      return `# Messages\n\nLast ${lines.length} messages:\n\n${lines.join("\n")}\n`;
+    },
+    files: {
+      "MESSAGE.md": {
+        source: { type: "self" },
+        render: (rows: Row[]) => {
+          const m = rows[0];
+          if (!m) return "";
+          return [
+            "# Message",
+            "",
+            `**Direction:** ${m.direction}`,
+            m.from_user ? `**From User:** ${m.from_user}` : null,
+            m.from_agent ? `**From Agent:** ${m.from_agent}` : null,
+            `**Channel:** ${m.channel}`,
+            m.thread_id ? `**Thread:** ${m.thread_id}` : null,
+            m.task_id ? `**Task:** ${m.task_id}` : null,
+            `**Time:** ${m.created_at}`,
+            "",
+            "---",
+            "",
+            m.body as string,
+            "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+        },
+      },
+    },
+  });
 }

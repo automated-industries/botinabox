@@ -102,18 +102,40 @@ export function defineCoreTables(db: DataStore): void {
   db.define("messages", {
     columns: {
       id: "TEXT PRIMARY KEY",
+      channel: "TEXT NOT NULL DEFAULT 'slack'",
+      direction: "TEXT NOT NULL DEFAULT 'inbound'",
+      from_user: "TEXT",
+      from_agent: "TEXT",
+      agent_id: "TEXT",
+      user_id: "TEXT",
+      body: "TEXT NOT NULL",
+      thread_id: "TEXT",
+      task_id: "TEXT",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      deleted_at: "TEXT",
+    },
+    tableConstraints: [
+      "CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at)",
+      "CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_id)",
+      "CREATE INDEX IF NOT EXISTS idx_messages_agent ON messages(agent_id)",
+    ],
+  });
+
+  db.define("sessions", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
       agent_id: "TEXT NOT NULL",
       channel: "TEXT NOT NULL",
       peer_id: "TEXT NOT NULL",
       user_id: "TEXT",
-      last_message_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
-      message_count: "INTEGER NOT NULL DEFAULT 0",
       context: "TEXT NOT NULL DEFAULT '{}'",
+      message_count: "INTEGER NOT NULL DEFAULT 0",
+      last_message_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       expires_at: "TEXT",
     },
     tableConstraints: [
-      "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_agent_channel_peer ON messages(agent_id, channel, peer_id)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_agent_channel_peer ON sessions(agent_id, channel, peer_id)",
     ],
   });
 
