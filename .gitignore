@@ -9,3 +9,5 @@ dist/
 !.env.example
 coverage/
 *.tsbuildinfo
+CLAUDE.md
+.claude/

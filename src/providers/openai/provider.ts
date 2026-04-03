@@ -129,7 +129,7 @@ export class OpenAIProvider implements LLMProvider {
       }
     }
 
-    const stream = this.client.chat.completions.stream(
+    const stream = (this.client.chat.completions as unknown as { stream: Function }).stream(
       {
         model,
         messages: openaiMessages,

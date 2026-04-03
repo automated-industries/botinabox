@@ -63,7 +63,7 @@ export class DataStore {
       tableConstraints: inlineConstraints.length ? inlineConstraints : undefined,
       relations: def.relations as Record<string, import('latticesql').Relation> | undefined,
       filter: def.filter,
-      render: def.render,
+      render: def.render as import('latticesql').RenderSpec | undefined,
       outputFile: def.outputFile,
     });
   }
