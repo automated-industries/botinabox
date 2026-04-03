@@ -20,7 +20,7 @@ export * from "./core/orchestrator/agent-registry.js";
 export * from "./core/orchestrator/task-queue.js";
 export * from "./core/orchestrator/run-manager.js";
 export * from "./core/orchestrator/budget-controller.js";
-export * from "./core/orchestrator/workflow-engine.js";
+export { WorkflowEngine } from "./core/orchestrator/workflow-engine.js";
 export * from "./core/orchestrator/wakeup-queue.js";
 export * from "./core/orchestrator/session-manager.js";
 export * from "./core/orchestrator/chain-guard.js";

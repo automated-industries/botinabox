@@ -1,0 +1,12 @@
+src/
+tests/
+docs/
+**/__tests__/
+*.test.ts
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+.github/
+CLAUDE.md
+.claude/
+coverage/
