@@ -22,6 +22,10 @@ export interface EntityContextDef {
   files: Record<string, EntityFileSpec>;
   indexFile?: string;
   protectedFiles?: string[];
+  /** When true, this entity's data is never rendered into other entities' context files. */
+  protected?: boolean;
+  /** Enable at-rest encryption. Requires encryptionKey in Lattice options. */
+  encrypted?: boolean | { columns: string[] };
 }
 
 export interface EntityFileSpec {

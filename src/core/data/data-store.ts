@@ -81,6 +81,8 @@ export class DataStore {
       directoryRoot: def.directory,
       files: def.files as Record<string, import('latticesql').EntityFileSpec>,
       protectedFiles: def.protectedFiles,
+      protected: def.protected,
+      encrypted: def.encrypted,
       index: def.indexFile
         ? { outputFile: def.indexFile, render: (rows: Row[]) => '' }
         : undefined,
