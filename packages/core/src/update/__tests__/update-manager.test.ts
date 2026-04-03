@@ -9,10 +9,10 @@ import type { PackageUpdate, UpdateManifest } from '../types.js';
 let db: DataStore;
 let hooks: HookBus;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
 });
 
@@ -135,7 +135,7 @@ describe('UpdateManager.applyUpdates', () => {
       policy: 'notify', // Returns empty filtered list — won't try to apply
     });
     await mgr.applyUpdates([patchUpdate]); // passes updates directly but filterByPolicy makes it []
-    const history = db.query('update_history');
+    const history = await db.query('update_history');
     expect(history).toHaveLength(0); // nothing applied due to policy
   });
 
@@ -157,20 +157,20 @@ describe('UpdateManager.applyUpdates', () => {
     await mgr.applyUpdates([patchUpdate]);
     // Either deferred event fired OR (unlikely) we're in the window
     // Just check nothing crashed
-    expect(db.query('update_history').length).toBeLessThanOrEqual(1);
+    expect((await db.query('update_history')).length).toBeLessThanOrEqual(1);
   });
 });
 
 describe('UpdateManager — migration hooks', () => {
   it('records update_history entry', async () => {
     // Insert a pending entry manually to verify the table works
-    const row = db.insert('update_history', {
+    const row = await db.insert('update_history', {
       from_version: '1.0.0',
       to_version: '1.0.1',
       status: 'succeeded',
     });
     expect(row['status']).toBe('succeeded');
-    const history = db.query('update_history');
+    const history = await db.query('update_history');
     expect(history).toHaveLength(1);
   });
 });

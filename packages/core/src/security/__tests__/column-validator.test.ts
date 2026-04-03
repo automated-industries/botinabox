@@ -1,20 +1,28 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SqliteAdapter } from '../../data/sqlite-adapter.js';
+import { DataStore } from '../../data/data-store.js';
+import { defineCoreTables } from '../../data/core-schema.js';
 import { ColumnValidatorImpl } from '../column-validator.js';
 
 describe('ColumnValidator', () => {
-  let adapter: SqliteAdapter;
+  let db: DataStore;
   let validator: ColumnValidatorImpl;
 
-  beforeEach(() => {
-    adapter = new SqliteAdapter(':memory:');
-    adapter.open();
-    adapter.run('CREATE TABLE users (id TEXT, name TEXT, email TEXT)');
-    validator = new ColumnValidatorImpl(adapter);
+  beforeEach(async () => {
+    db = new DataStore({ dbPath: ':memory:' });
+    defineCoreTables(db);
+    db.define('users', {
+      columns: {
+        id: 'TEXT PRIMARY KEY',
+        name: 'TEXT',
+        email: 'TEXT',
+      },
+    });
+    await db.init();
+    validator = new ColumnValidatorImpl(db);
   });
 
   afterEach(() => {
-    adapter.close();
+    db.close();
   });
 
   it('validateWrite strips unknown columns', () => {
@@ -40,11 +48,11 @@ describe('ColumnValidator', () => {
     );
   });
 
-  it('invalidateCache clears the cache so fresh info is fetched', () => {
+  it('invalidateCache clears the cache so fresh info is fetched', async () => {
     // Fetch once to populate cache
     validator.validateRead('users', ['id', 'name']);
-    // Add a new column
-    adapter.run('ALTER TABLE users ADD COLUMN phone TEXT');
+    // Add a new column via raw SQL through a migration
+    await db.migrate([{ version: 'test:add-phone', sql: 'ALTER TABLE users ADD COLUMN phone TEXT' }]);
     // Without invalidation, the new column would not be known
     validator.invalidateCache('users');
     // Now it should know about phone

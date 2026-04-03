@@ -1,4 +1,4 @@
-import type { SqliteAdapter } from '../data/sqlite-adapter.js';
+import type { DataStore } from '../data/data-store.js';
 
 export interface ColumnValidator {
   validateWrite(table: string, row: Record<string, unknown>): Record<string, unknown>;
@@ -11,17 +11,16 @@ export interface ColumnValidator {
  *
  * - validateWrite: strips unknown columns silently
  * - validateRead: throws on unknown columns
- * - invalidateCache: clears the per-table cache
  */
 export class ColumnValidatorImpl implements ColumnValidator {
-  private readonly adapter: SqliteAdapter;
+  private readonly db: DataStore;
 
-  constructor(adapter: SqliteAdapter) {
-    this.adapter = adapter;
+  constructor(db: DataStore) {
+    this.db = db;
   }
 
   private getValidColumns(table: string): Set<string> {
-    const rows = this.adapter.tableInfo(table);
+    const rows = this.db.tableInfo(table);
     return new Set(rows.map(r => r.name));
   }
 
@@ -32,7 +31,6 @@ export class ColumnValidatorImpl implements ColumnValidator {
       if (valid.has(col)) {
         result[col] = val;
       }
-      // Unknown columns are silently dropped
     }
     return result;
   }
@@ -46,7 +44,7 @@ export class ColumnValidatorImpl implements ColumnValidator {
     }
   }
 
-  invalidateCache(table: string): void {
-    this.adapter.invalidateTableCache(table);
+  invalidateCache(_table: string): void {
+    // No-op: DataStore.tableInfo() queries SQLite directly each time (no cache)
   }
 }

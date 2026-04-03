@@ -6,10 +6,10 @@ import { SessionManager } from '../session-manager.js';
 let db: DataStore;
 let manager: SessionManager;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   manager = new SessionManager(db);
 });
 

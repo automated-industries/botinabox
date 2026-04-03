@@ -66,16 +66,16 @@ export class WorkflowEngine {
     }
 
     // Store in workflows table
-    const existing = this.db.query('workflows', { where: { slug } });
+    const existing = await this.db.query('workflows', { where: { slug } });
     if (existing.length > 0) {
-      this.db.update('workflows', { slug }, {
+      await this.db.update('workflows', { slug }, {
         name: def.name,
         description: def.description,
         definition: JSON.stringify(def),
         updated_at: new Date().toISOString(),
       });
     } else {
-      this.db.insert('workflows', {
+      await this.db.insert('workflows', {
         slug,
         name: def.name,
         description: def.description,
@@ -88,7 +88,7 @@ export class WorkflowEngine {
    * Start a workflow run.
    */
   async start(workflowSlug: string, context: Record<string, unknown>): Promise<string> {
-    const workflows = this.db.query('workflows', { where: { slug: workflowSlug } });
+    const workflows = await this.db.query('workflows', { where: { slug: workflowSlug } });
     if (workflows.length === 0) {
       throw new Error(`Workflow not found: ${workflowSlug}`);
     }
@@ -96,7 +96,7 @@ export class WorkflowEngine {
     const def = JSON.parse(workflow['definition'] as string) as WorkflowDefinition;
 
     // Create workflow_run record
-    const runRow = this.db.insert('workflow_runs', {
+    const runRow = await this.db.insert('workflow_runs', {
       workflow_id: workflow['id'],
       status: 'running',
       step_results: JSON.stringify({}),
@@ -118,13 +118,13 @@ export class WorkflowEngine {
    * Called when a task with workflow_run_id completes.
    */
   async onStepCompleted(taskId: string, output: string): Promise<void> {
-    const task = this.db.get('tasks', { id: taskId });
+    const task = await this.db.get('tasks', { id: taskId });
     if (!task || !task['workflow_run_id']) return;
 
     const workflowRunId = task['workflow_run_id'] as string;
     const stepId = task['workflow_step_id'] as string | undefined;
 
-    const run = this.db.get('workflow_runs', { id: workflowRunId });
+    const run = await this.db.get('workflow_runs', { id: workflowRunId });
     if (!run || run['status'] !== 'running') return;
 
     // Update step_results
@@ -132,13 +132,13 @@ export class WorkflowEngine {
     if (stepId) {
       stepResults[stepId] = { output, taskId };
     }
-    this.db.update('workflow_runs', { id: workflowRunId }, {
+    await this.db.update('workflow_runs', { id: workflowRunId }, {
       step_results: JSON.stringify(stepResults),
       current_step: stepId,
     });
 
     // Find workflow definition
-    const workflow = this.db.get('workflows', { id: run['workflow_id'] as string });
+    const workflow = await this.db.get('workflows', { id: run['workflow_id'] as string });
     if (!workflow) return;
     const def = JSON.parse(workflow['definition'] as string) as WorkflowDefinition;
 
@@ -151,7 +151,7 @@ export class WorkflowEngine {
     const fullContext = { ...runContext, steps: stepsContext };
 
     // Find completed step IDs (all tasks for this run that succeeded)
-    const allRunTasks = this.db.query('tasks', { where: { workflow_run_id: workflowRunId } });
+    const allRunTasks = await this.db.query('tasks', { where: { workflow_run_id: workflowRunId } });
     const completedStepIds = new Set(
       allRunTasks
         .filter((t) => t['status'] === 'done' || t['id'] === taskId)
@@ -178,7 +178,7 @@ export class WorkflowEngine {
       const allStepIds = new Set(def.steps.map((s) => s.id));
       const allDone = [...allStepIds].every((id) => completedStepIds.has(id));
       if (allDone) {
-        this.db.update('workflow_runs', { id: workflowRunId }, {
+        await this.db.update('workflow_runs', { id: workflowRunId }, {
           status: 'completed',
           completed_at: new Date().toISOString(),
         });
@@ -196,23 +196,23 @@ export class WorkflowEngine {
    * Mark a workflow run as failed.
    */
   async onStepFailed(taskId: string, error: string): Promise<void> {
-    const task = this.db.get('tasks', { id: taskId });
+    const task = await this.db.get('tasks', { id: taskId });
     if (!task || !task['workflow_run_id']) return;
 
     const workflowRunId = task['workflow_run_id'] as string;
     const stepId = task['workflow_step_id'] as string | undefined;
 
-    const run = this.db.get('workflow_runs', { id: workflowRunId });
+    const run = await this.db.get('workflow_runs', { id: workflowRunId });
     if (!run || run['status'] !== 'running') return;
 
     // Find workflow definition to check onFail behavior
-    const workflow = this.db.get('workflows', { id: run['workflow_id'] as string });
+    const workflow = await this.db.get('workflows', { id: run['workflow_id'] as string });
     if (!workflow) return;
     const def = JSON.parse(workflow['definition'] as string) as WorkflowDefinition;
     const step = stepId ? def.steps.find((s) => s.id === stepId) : undefined;
 
     if (!step || step.onFail === 'abort' || !step.onFail) {
-      this.db.update('workflow_runs', { id: workflowRunId }, {
+      await this.db.update('workflow_runs', { id: workflowRunId }, {
         status: 'failed',
         error,
         completed_at: new Date().toISOString(),
@@ -231,7 +231,7 @@ export class WorkflowEngine {
     // Find agent id by slug if agentSlug provided
     let assigneeId: string | undefined;
     if (step.agentSlug) {
-      const agents = this.db.query('agents', { where: { slug: step.agentSlug } });
+      const agents = await this.db.query('agents', { where: { slug: step.agentSlug } });
       if (agents.length > 0) {
         assigneeId = agents[0]!['id'] as string;
       }

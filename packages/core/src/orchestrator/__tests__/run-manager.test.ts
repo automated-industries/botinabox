@@ -8,10 +8,10 @@ let db: DataStore;
 let hooks: HookBus;
 let manager: RunManager;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
   manager = new RunManager(db, hooks, { staleThresholdMs: 100 });
 });
@@ -25,7 +25,7 @@ describe('RunManager — Story 3.3', () => {
   it('startRun creates run record and returns id', async () => {
     const runId = await manager.startRun('agent-1', 'task-1');
     expect(typeof runId).toBe('string');
-    const run = db.get('runs', { id: runId });
+    const run = await db.get('runs', { id: runId });
     expect(run!['status']).toBe('running');
   });
 
@@ -43,7 +43,7 @@ describe('RunManager — Story 3.3', () => {
   it('finishRun marks run succeeded when exitCode=0', async () => {
     const runId = await manager.startRun('agent-1', 'task-1');
     await manager.finishRun(runId, { exitCode: 0 });
-    const run = db.get('runs', { id: runId });
+    const run = await db.get('runs', { id: runId });
     expect(run!['status']).toBe('succeeded');
     expect(manager.isLocked('agent-1')).toBe(false);
   });
@@ -51,7 +51,7 @@ describe('RunManager — Story 3.3', () => {
   it('finishRun marks run failed when exitCode!=0', async () => {
     const runId = await manager.startRun('agent-1', 'task-1');
     await manager.finishRun(runId, { exitCode: 1 });
-    const run = db.get('runs', { id: runId });
+    const run = await db.get('runs', { id: runId });
     expect(run!['status']).toBe('failed');
   });
 
@@ -66,7 +66,7 @@ describe('RunManager — Story 3.3', () => {
 
   it('reapOrphans marks stale running runs as failed', async () => {
     // Insert a run directly with a very old started_at
-    const row = db.insert('runs', {
+    const row = await db.insert('runs', {
       agent_id: 'agent-stale',
       task_id: 'task-stale',
       status: 'running',
@@ -78,7 +78,7 @@ describe('RunManager — Story 3.3', () => {
     await new Promise((r) => setTimeout(r, 150));
     await shortManager.reapOrphans();
 
-    const run = db.get('runs', { id: row['id'] });
+    const run = await db.get('runs', { id: row['id'] });
     expect(run!['status']).toBe('failed');
   });
 

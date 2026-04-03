@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@botinabox/shared": "workspace:*",
-    "better-sqlite3": "^11.10.0",
+    "latticesql": "^0.16.2",
     "yaml": "^2.7.0",
     "ajv": "^8.17.1"
   },

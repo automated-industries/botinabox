@@ -6,10 +6,10 @@ import { WakeupQueue } from '../wakeup-queue.js';
 let db: DataStore;
 let queue: WakeupQueue;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   queue = new WakeupQueue(db);
 });
 

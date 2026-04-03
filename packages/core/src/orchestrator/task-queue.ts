@@ -30,7 +30,7 @@ export class TaskQueue {
     const depth = task.chain_depth ?? 0;
     checkChainDepth(depth, MAX_CHAIN_DEPTH);
 
-    const row = this.db.insert('tasks', {
+    const row = await this.db.insert('tasks', {
       title: task.title,
       description: task.description,
       assignee_id: task.assignee_id,
@@ -50,21 +50,21 @@ export class TaskQueue {
   }
 
   async update(id: string, changes: Record<string, unknown>): Promise<void> {
-    this.db.update('tasks', { id }, {
+    await this.db.update('tasks', { id }, {
       ...changes,
       updated_at: new Date().toISOString(),
     });
   }
 
   async get(id: string): Promise<Record<string, unknown> | undefined> {
-    return this.db.get('tasks', { id }) ?? undefined;
+    return (await this.db.get('tasks', { id })) ?? undefined;
   }
 
   async list(filter?: { status?: string; assignee_id?: string }): Promise<Record<string, unknown>[]> {
     const where: Record<string, unknown> = {};
     if (filter?.status) where['status'] = filter.status;
     if (filter?.assignee_id) where['assignee_id'] = filter.assignee_id;
-    return this.db.query('tasks', Object.keys(where).length ? { where } : undefined);
+    return await this.db.query('tasks', Object.keys(where).length ? { where } : undefined);
   }
 
   startPolling(): void {
@@ -83,12 +83,12 @@ export class TaskQueue {
 
   private async poll(): Promise<void> {
     // Find tasks with status='todo', assignee_id NOT NULL
-    const todoTasks = this.db.query('tasks', { where: { status: 'todo' } })
+    const todoTasks = (await this.db.query('tasks', { where: { status: 'todo' } }))
       .filter((t) => t['assignee_id'] != null);
 
     // Check which have no active run
     const activeTasks = new Set(
-      this.db.query('runs', { where: { status: 'running' } }).map((r) => r['task_id'] as string)
+      (await this.db.query('runs', { where: { status: 'running' } })).map((r) => r['task_id'] as string)
     );
 
     const eligible = todoTasks

@@ -14,7 +14,7 @@ export async function runPackageMigrations(
   db: DataStore,
   migrations: PackageMigration[],
 ): Promise<void> {
-  db.migrate(
+  await db.migrate(
     migrations.map((m) => ({
       version: `${m.package}:${m.version}`,
       sql: m.sql,

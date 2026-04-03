@@ -37,10 +37,10 @@ let db: DataStore;
 let hooks: HookBus;
 let channelRegistry: ChannelRegistry;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ":memory:" });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
   channelRegistry = new ChannelRegistry();
 });
@@ -54,7 +54,7 @@ describe("NotificationQueue — Story 4.4", () => {
     const queue = new NotificationQueue(db, hooks, channelRegistry);
     const id = await queue.enqueue("slack", "user-1", { text: "hello" });
 
-    const rows = db.query("notifications");
+    const rows = await db.query("notifications");
     expect(rows).toHaveLength(1);
     expect(rows[0]["id"]).toBe(id);
     expect(rows[0]["status"]).toBe("pending");
@@ -84,7 +84,7 @@ describe("NotificationQueue — Story 4.4", () => {
     await new Promise((r) => setTimeout(r, 150));
     queue.stopWorker();
 
-    const rows = db.query("notifications");
+    const rows = await db.query("notifications");
     expect(rows[0]["status"]).toBe("sent");
   });
 
@@ -105,7 +105,7 @@ describe("NotificationQueue — Story 4.4", () => {
     await q.processNext();
     await q.processNext();
 
-    const rows = db.query("notifications");
+    const rows = await db.query("notifications");
     expect(rows[0]["status"]).toBe("failed");
     expect(rows[0]["retries"]).toBeGreaterThanOrEqual(2);
   });
@@ -123,7 +123,7 @@ describe("NotificationQueue — Story 4.4", () => {
     const q = queue as unknown as { processNext(): Promise<void> };
     await q.processNext();
 
-    const rows = db.query("notifications");
+    const rows = await db.query("notifications");
     expect(rows[0]["status"]).toBe("pending"); // still pending, not yet at maxRetries
     expect(Number(rows[0]["retries"])).toBe(1);
   });
@@ -135,7 +135,7 @@ describe("NotificationQueue — Story 4.4", () => {
     const q = queue as unknown as { processNext(): Promise<void> };
     await q.processNext();
 
-    const rows = db.query("notifications");
+    const rows = await db.query("notifications");
     expect(rows[0]["status"]).toBe("failed");
   });
 });

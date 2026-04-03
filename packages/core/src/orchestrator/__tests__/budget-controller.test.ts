@@ -8,10 +8,10 @@ let db: DataStore;
 let hooks: HookBus;
 let controller: BudgetController;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
   controller = new BudgetController(db, hooks);
 });
@@ -20,8 +20,8 @@ afterEach(() => {
   db.close();
 });
 
-function createAgent(overrides: Record<string, unknown> = {}): string {
-  const row = db.insert('agents', {
+async function createAgent(overrides: Record<string, unknown> = {}): Promise<string> {
+  const row = await db.insert('agents', {
     slug: `agent-${Math.random().toString(36).slice(2)}`,
     name: 'Test Agent',
     adapter: 'cli',
@@ -34,7 +34,7 @@ function createAgent(overrides: Record<string, unknown> = {}): string {
 
 describe('BudgetController — Story 3.6', () => {
   it('allows when spend is below limit', async () => {
-    const id = createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 500 });
+    const id = await createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 500 });
     const result = await controller.checkBudget(id);
     expect(result.allowed).toBe(true);
     expect(result.currentSpendCents).toBe(500);
@@ -42,14 +42,14 @@ describe('BudgetController — Story 3.6', () => {
   });
 
   it('blocks when spend equals limit', async () => {
-    const id = createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 1000 });
+    const id = await createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 1000 });
     const result = await controller.checkBudget(id);
     expect(result.allowed).toBe(false);
     expect(result.reason).toBe('Monthly budget exceeded');
   });
 
   it('blocks when spend exceeds limit', async () => {
-    const id = createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 1100 });
+    const id = await createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 1100 });
     const result = await controller.checkBudget(id);
     expect(result.allowed).toBe(false);
   });
@@ -58,7 +58,7 @@ describe('BudgetController — Story 3.6', () => {
     const events: Record<string, unknown>[] = [];
     hooks.register('budget.exceeded', (ctx) => { events.push(ctx); });
 
-    const id = createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 850 });
+    const id = await createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 850 });
     const result = await controller.checkBudget(id);
 
     expect(result.allowed).toBe(true); // Still allowed
@@ -67,23 +67,23 @@ describe('BudgetController — Story 3.6', () => {
   });
 
   it('no budget = always allowed', async () => {
-    const id = createAgent({ budget_monthly_cents: 0, spent_monthly_cents: 0 });
+    const id = await createAgent({ budget_monthly_cents: 0, spent_monthly_cents: 0 });
     const result = await controller.checkBudget(id);
     expect(result.allowed).toBe(true);
   });
 
   it('resetMonthlySpend sets spent to zero', async () => {
-    const id = createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 500 });
+    const id = await createAgent({ budget_monthly_cents: 1000, spent_monthly_cents: 500 });
     await controller.resetMonthlySpend(id);
-    const agent = db.get('agents', { id });
+    const agent = await db.get('agents', { id });
     expect(agent!['spent_monthly_cents']).toBe(0);
   });
 
   it('globalCheck returns allowed when total < global limit', async () => {
-    createAgent({ spent_monthly_cents: 100 });
-    createAgent({ spent_monthly_cents: 200 });
+    await createAgent({ spent_monthly_cents: 100 });
+    await createAgent({ spent_monthly_cents: 200 });
 
-    db.insert('budget_policies', {
+    await db.insert('budget_policies', {
       scope: 'global',
       monthly_limit_cents: 1000,
       warn_percent: 80,
@@ -96,10 +96,10 @@ describe('BudgetController — Story 3.6', () => {
   });
 
   it('globalCheck returns not allowed when total >= global limit', async () => {
-    createAgent({ spent_monthly_cents: 600 });
-    createAgent({ spent_monthly_cents: 500 });
+    await createAgent({ spent_monthly_cents: 600 });
+    await createAgent({ spent_monthly_cents: 500 });
 
-    db.insert('budget_policies', {
+    await db.insert('budget_policies', {
       scope: 'global',
       monthly_limit_cents: 1000,
       warn_percent: 80,
@@ -111,7 +111,7 @@ describe('BudgetController — Story 3.6', () => {
   });
 
   it('globalCheck allows when no global policy exists', async () => {
-    createAgent({ spent_monthly_cents: 999_999 });
+    await createAgent({ spent_monthly_cents: 999_999 });
     const result = await controller.globalCheck();
     expect(result.allowed).toBe(true);
   });

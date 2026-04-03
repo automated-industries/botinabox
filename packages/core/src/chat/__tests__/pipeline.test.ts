@@ -45,10 +45,10 @@ function makeConfig(overrides: Partial<BotConfig> = {}): BotConfig {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ":memory:" });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
   agentRegistry = new AgentRegistry(db, hooks);
   taskQueue = new TaskQueue(db, hooks);
@@ -65,7 +65,7 @@ describe("MessagePipeline — Story 4.2", () => {
 
     await pipeline.processInbound(makeMsg());
 
-    const tasks = db.query("tasks");
+    const tasks = await db.query("tasks");
     expect(tasks).toHaveLength(1);
     expect(tasks[0]["assignee_id"]).toBe("agent-1");
   });
@@ -117,7 +117,7 @@ describe("MessagePipeline — Story 4.2", () => {
     const pipeline = new MessagePipeline(hooks, agentRegistry, taskQueue, config);
 
     await pipeline.processInbound(makeMsg({ channel: "slack", from: "blocked-user" }));
-    const tasks = db.query("tasks");
+    const tasks = await db.query("tasks");
     expect(tasks).toHaveLength(0);
   });
 
@@ -130,7 +130,7 @@ describe("MessagePipeline — Story 4.2", () => {
     const pipeline = new MessagePipeline(hooks, agentRegistry, taskQueue, config);
 
     await pipeline.processInbound(makeMsg({ channel: "slack", from: "allowed-user" }));
-    const tasks = db.query("tasks");
+    const tasks = await db.query("tasks");
     expect(tasks).toHaveLength(1);
   });
 
@@ -144,7 +144,7 @@ describe("MessagePipeline — Story 4.2", () => {
     const pipeline = new MessagePipeline(hooks, agentRegistry, taskQueue, config);
 
     await pipeline.processInbound(makeMsg({ channel: "slack", body: "hello" }));
-    const tasks = db.query("tasks");
+    const tasks = await db.query("tasks");
     expect(tasks).toHaveLength(0);
   });
 
@@ -158,7 +158,7 @@ describe("MessagePipeline — Story 4.2", () => {
     const pipeline = new MessagePipeline(hooks, agentRegistry, taskQueue, config);
 
     await pipeline.processInbound(makeMsg({ channel: "slack", body: "@agent-1 hello" }));
-    const tasks = db.query("tasks");
+    const tasks = await db.query("tasks");
     expect(tasks).toHaveLength(1);
   });
 

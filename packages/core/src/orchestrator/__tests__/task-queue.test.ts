@@ -8,10 +8,10 @@ let db: DataStore;
 let hooks: HookBus;
 let queue: TaskQueue;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
   queue = new TaskQueue(db, hooks, { pollIntervalMs: 50 });
 });

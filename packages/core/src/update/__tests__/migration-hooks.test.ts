@@ -6,10 +6,10 @@ import type { PackageMigration } from '../migration-hooks.js';
 
 let db: DataStore;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
 });
 
 afterEach(() => {

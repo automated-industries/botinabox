@@ -11,7 +11,7 @@ let registry: AgentRegistry;
 beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
   registry = new AgentRegistry(db, hooks);
 });
@@ -81,7 +81,7 @@ describe('AgentRegistry — Story 3.1', () => {
   it('update creates config_revision', async () => {
     const id = await registry.register({ slug: 'bot-7', name: 'Bot Seven', adapter: 'cli' });
     await registry.update(id, { name: 'Bot Seven Updated' });
-    const revisions = db.query('config_revisions', { where: { notes: id } });
+    const revisions = await db.query('config_revisions', { where: { notes: id } });
     expect(revisions.length).toBeGreaterThan(0);
   });
 
@@ -102,7 +102,7 @@ describe('AgentRegistry — Story 3.1', () => {
     expect(agent!['status']).toBe('terminated');
     expect(agent!['deleted_at']).toBeTruthy();
 
-    const logs = db.query('activity_log', { where: { agent_id: id } });
+    const logs = await db.query('activity_log', { where: { agent_id: id } });
     expect(logs.some((l) => l['event_type'] === 'agent.terminated')).toBe(true);
   });
 

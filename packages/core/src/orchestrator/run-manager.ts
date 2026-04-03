@@ -29,7 +29,7 @@ export class RunManager {
       throw new Error(`Agent already has an active run`);
     }
 
-    const row = this.db.insert('runs', {
+    const row = await this.db.insert('runs', {
       agent_id: agentId,
       task_id: taskId,
       adapter: adapter,
@@ -51,14 +51,14 @@ export class RunManager {
       usage?: unknown;
     },
   ): Promise<void> {
-    const run = this.db.get('runs', { id: runId });
+    const run = await this.db.get('runs', { id: runId });
     if (!run) throw new Error(`Run not found: ${runId}`);
 
     const succeeded = result.exitCode === 0;
     const status = succeeded ? 'succeeded' : 'failed';
     const usage = result.usage as Record<string, unknown> | undefined;
 
-    this.db.update('runs', { id: runId }, {
+    await this.db.update('runs', { id: runId }, {
       status,
       completed_at: new Date().toISOString(),
       exit_code: result.exitCode,
@@ -76,7 +76,7 @@ export class RunManager {
 
     if (!succeeded) {
       // Retry policy
-      const task = this.db.get('tasks', { id: taskId });
+      const task = await this.db.get('tasks', { id: taskId });
       if (task) {
         const retryCount = (task['retry_count'] as number) ?? 0;
         const maxRetries = (task['max_retries'] as number) ?? 0;
@@ -85,18 +85,24 @@ export class RunManager {
           const maxBackoff = this.config?.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
           const backoffMs = Math.min(BASE_BACKOFF_MS * Math.pow(2, retryCount), maxBackoff);
           const nextRetryAt = new Date(Date.now() + backoffMs).toISOString();
-          this.db.update('tasks', { id: taskId }, {
+          await this.db.update('tasks', { id: taskId }, {
             retry_count: retryCount + 1,
             next_retry_at: nextRetryAt,
             status: 'todo',
             execution_run_id: null,
             updated_at: new Date().toISOString(),
           });
+        } else {
+          // Retries exhausted — mark task as failed
+          await this.db.update('tasks', { id: taskId }, {
+            status: 'failed',
+            updated_at: new Date().toISOString(),
+          });
         }
       }
     } else {
       // Followup chain
-      const task = this.db.get('tasks', { id: taskId });
+      const task = await this.db.get('tasks', { id: taskId });
       if (task && task['followup_agent_id']) {
         const chainDepth = ((task['chain_depth'] as number) ?? 0) + 1;
         checkChainDepth(chainDepth, MAX_CHAIN_DEPTH);
@@ -107,7 +113,7 @@ export class RunManager {
         const title = interpolate(followupTemplate, context);
         const chainOriginId = (task['chain_origin_id'] as string | undefined) ?? taskId;
 
-        this.db.insert('tasks', {
+        await this.db.insert('tasks', {
           title,
           description: title,
           assignee_id: followupAgentId,
@@ -137,14 +143,14 @@ export class RunManager {
   async reapOrphans(): Promise<void> {
     const cutoff = new Date(Date.now() - this.staleThresholdMs).toISOString();
 
-    const staleRuns = this.db.query('runs', { where: { status: 'running' } })
+    const staleRuns = (await this.db.query('runs', { where: { status: 'running' } }))
       .filter((r) => {
         const startedAt = r['started_at'] as string | null;
         return startedAt != null && startedAt < cutoff;
       });
 
     for (const run of staleRuns) {
-      this.db.update('runs', { id: run['id'] }, {
+      await this.db.update('runs', { id: run['id'] }, {
         status: 'failed',
         completed_at: new Date().toISOString(),
         error_message: 'Orphaned run reaped by RunManager',

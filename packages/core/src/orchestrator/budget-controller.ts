@@ -10,7 +10,7 @@ export class BudgetController {
     currentSpendCents: number;
     limitCents: number;
   }> {
-    const agent = this.db.get('agents', { id: agentId });
+    const agent = await this.db.get('agents', { id: agentId });
     if (!agent) {
       throw new Error(`Agent not found: ${agentId}`);
     }
@@ -34,7 +34,7 @@ export class BudgetController {
 
     // Check warn threshold — look up agent-specific policy first, then global
     let warnPercent = 80;
-    const agentPolicies = this.db.query('budget_policies', {
+    const agentPolicies = await this.db.query('budget_policies', {
       where: { agent_id: agentId },
     });
     if (agentPolicies.length > 0) {
@@ -56,7 +56,7 @@ export class BudgetController {
   }
 
   async resetMonthlySpend(agentId: string): Promise<void> {
-    this.db.update('agents', { id: agentId }, {
+    await this.db.update('agents', { id: agentId }, {
       spent_monthly_cents: 0,
       updated_at: new Date().toISOString(),
     });
@@ -67,14 +67,14 @@ export class BudgetController {
     totalSpentCents: number;
     limitCents: number;
   }> {
-    const agents = this.db.query('agents');
+    const agents = await this.db.query('agents');
     const totalSpentCents = agents.reduce(
       (sum, a) => sum + ((a['spent_monthly_cents'] as number) ?? 0),
       0,
     );
 
     // Find global budget policy
-    const globalPolicies = this.db.query('budget_policies', {
+    const globalPolicies = await this.db.query('budget_policies', {
       where: { scope: 'global' },
     });
 

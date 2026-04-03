@@ -37,7 +37,7 @@ export class NotificationQueue {
     recipient: string,
     payload: { text: string; threadId?: string; [key: string]: unknown },
   ): Promise<string> {
-    const row = this.db.insert("notifications", {
+    const row = await this.db.insert("notifications", {
       channel,
       recipient_id: recipient,
       message: JSON.stringify(payload),
@@ -72,7 +72,7 @@ export class NotificationQueue {
 
   private async processNext(): Promise<void> {
     // Query up to 10 pending or retry notifications
-    const rows = this.db.query("notifications", {
+    const rows = await this.db.query("notifications", {
       where: { status: "pending" },
       limit: 10,
     });
@@ -87,13 +87,13 @@ export class NotificationQueue {
       try {
         payload = JSON.parse(row["message"] as string) as OutboundPayload;
       } catch {
-        this.db.update("notifications", { id }, { status: "failed", error: "Invalid payload" });
+        await this.db.update("notifications", { id }, { status: "failed", error: "Invalid payload" });
         continue;
       }
 
       const adapter = this.channelRegistry.get(channel);
       if (!adapter) {
-        this.db.update("notifications", { id }, {
+        await this.db.update("notifications", { id }, {
           status: "failed",
           error: `No adapter for channel: ${channel}`,
         });
@@ -102,7 +102,7 @@ export class NotificationQueue {
 
       try {
         await adapter.send({ peerId: recipient, threadId: payload.threadId }, payload);
-        this.db.update("notifications", { id }, {
+        await this.db.update("notifications", { id }, {
           status: "sent",
           sent_at: new Date().toISOString(),
         });
@@ -110,14 +110,14 @@ export class NotificationQueue {
       } catch (err) {
         const newRetries = retries + 1;
         if (newRetries >= this.maxRetries) {
-          this.db.update("notifications", { id }, {
+          await this.db.update("notifications", { id }, {
             status: "failed",
             retries: newRetries,
             error: String(err),
           });
           await this.hooks.emit("notification.failed", { notificationId: id, channel, recipient, error: String(err) });
         } else {
-          this.db.update("notifications", { id }, {
+          await this.db.update("notifications", { id }, {
             status: "pending",
             retries: newRetries,
             error: String(err),

@@ -8,10 +8,10 @@ let db: DataStore;
 let hooks: HookBus;
 let registry: AgentRegistry;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
   registry = new AgentRegistry(db, hooks);
 });
@@ -85,7 +85,7 @@ describe('Agent Creates Agent — Story 5.5', () => {
       { actorAgentId: actorId },
     );
 
-    const logs = db.query('activity_log', { where: { event_type: 'agent_created_by_agent' } });
+    const logs = await db.query('activity_log', { where: { event_type: 'agent_created_by_agent' } });
     expect(logs).toHaveLength(1);
     const payload = JSON.parse(logs[0]!['payload'] as string) as Record<string, unknown>;
     expect(payload['actorAgentId']).toBe(actorId);

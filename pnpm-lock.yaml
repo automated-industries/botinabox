@@ -80,6 +80,28 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@22.19.15)(yaml@2.8.3)
 
+  packages/cli:
+    dependencies:
+      '@botinabox/core':
+        specifier: workspace:*
+        version: link:../core
+      '@botinabox/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.19.15
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(postcss@8.5.8)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@22.19.15)(yaml@2.8.3)
+
   packages/core:
     dependencies:
       '@botinabox/shared':
@@ -88,9 +110,9 @@ importers:
       ajv:
         specifier: ^8.17.1
         version: 8.18.0
-      better-sqlite3:
-        specifier: ^11.10.0
-        version: 11.10.0
+      latticesql:
+        specifier: ^0.16.2
+        version: 0.16.2
       yaml:
         specifier: ^2.7.0
         version: 2.8.3
@@ -581,8 +603,9 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  better-sqlite3@11.10.0:
-    resolution: {integrity: sha512-EwhOpyXiOEL/lKzHz9AW1msWFNzGc/z+LzeB3/jnFJpxu+th2yqvzsSWas1v9jgs9+xiXJcD5A8CJxAG2TaghQ==}
+  better-sqlite3@12.8.0:
+    resolution: {integrity: sha512-RxD2Vd96sQDjQr20kdP+F+dK/1OUNiVOl200vKBZY8u0vTwysfolF6Hq+3ZK2+h8My9YvZhHsF+RSGZW2VYrPQ==}
+    engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x}
 
   bindings@1.5.0:
     resolution: {integrity: sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==}
@@ -803,6 +826,11 @@ packages:
 
   json-schema-traverse@1.0.0:
     resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
+
+  latticesql@0.16.2:
+    resolution: {integrity: sha512-hcS4yEGDyeeMQrJteqaQuDrqKboDaUuaE4E3Oy1fKzZtHPHJnrgHy7Mm1tJEx09jaoVz3E3KxDc+aqTejvMtqg==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   lilconfig@3.1.3:
     resolution: {integrity: sha512-/vlFKAoH5Cgt3Ie+JLhRbwOsCQePABiU3tJ1egGvyQ+33R/vcwM2Zl2QR/LzjsBeItPt3oSVXapn+m4nQDvpzw==}
@@ -1104,6 +1132,10 @@ packages:
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
+
+  uuid@13.0.0:
+    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
+    hasBin: true
 
   vite-node@3.2.4:
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
@@ -1465,7 +1497,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  better-sqlite3@11.10.0:
+  better-sqlite3@12.8.0:
     dependencies:
       bindings: 1.5.0
       prebuild-install: 7.1.3
@@ -1690,6 +1722,12 @@ snapshots:
   js-tokens@9.0.1: {}
 
   json-schema-traverse@1.0.0: {}
+
+  latticesql@0.16.2:
+    dependencies:
+      better-sqlite3: 12.8.0
+      uuid: 13.0.0
+      yaml: 2.8.3
 
   lilconfig@3.1.3: {}
 
@@ -1990,6 +2028,8 @@ snapshots:
   undici-types@6.21.0: {}
 
   util-deprecate@1.0.2: {}
+
+  uuid@13.0.0: {}
 
   vite-node@3.2.4(@types/node@22.19.15)(yaml@2.8.3):
     dependencies:

@@ -30,7 +30,7 @@ export class AgentRegistry {
 
     // Permission check: if actorAgentId is set, verify the actor can create agents
     if (opts?.actorAgentId) {
-      const actor = this.db.get('agents', { id: opts.actorAgentId });
+      const actor = await this.db.get('agents', { id: opts.actorAgentId });
       if (!actor) throw new Error(`Actor agent not found: ${opts.actorAgentId}`);
 
       // Check canCreateAgents in adapter_config JSON
@@ -47,7 +47,7 @@ export class AgentRegistry {
       }
     }
 
-    const row = this.db.insert('agents', {
+    const row = await this.db.insert('agents', {
       slug: agent.slug,
       name: agent.name,
       adapter: agent.adapter,
@@ -60,7 +60,7 @@ export class AgentRegistry {
     const newAgentId = row['id'] as string;
 
     if (opts?.actorAgentId) {
-      this.db.insert('activity_log', {
+      await this.db.insert('activity_log', {
         agent_id: opts.actorAgentId,
         event_type: 'agent_created_by_agent',
         payload: JSON.stringify({
@@ -76,11 +76,11 @@ export class AgentRegistry {
   }
 
   async getById(id: string): Promise<Record<string, unknown> | undefined> {
-    return this.db.get('agents', { id }) ?? undefined;
+    return (await this.db.get('agents', { id })) ?? undefined;
   }
 
   async getBySlug(slug: string): Promise<Record<string, unknown> | undefined> {
-    const rows = this.db.query('agents', { where: { slug } });
+    const rows = await this.db.query('agents', { where: { slug } });
     return rows[0] ?? undefined;
   }
 
@@ -88,24 +88,24 @@ export class AgentRegistry {
     const where: Record<string, unknown> = {};
     if (filter?.status) where['status'] = filter.status;
     if (filter?.role) where['role'] = filter.role;
-    return this.db.query('agents', Object.keys(where).length ? { where } : undefined);
+    return await this.db.query('agents', Object.keys(where).length ? { where } : undefined);
   }
 
   async update(id: string, changes: Record<string, unknown>): Promise<void> {
-    const existing = this.db.get('agents', { id });
+    const existing = await this.db.get('agents', { id });
     if (!existing) throw new Error(`Agent not found: ${id}`);
 
     const before = { ...existing };
     await createConfigRevision(this.db, id, before, { ...before, ...changes });
 
-    this.db.update('agents', { id }, {
+    await this.db.update('agents', { id }, {
       ...changes,
       updated_at: new Date().toISOString(),
     });
   }
 
   async setStatus(id: string, newStatus: string): Promise<void> {
-    const agent = this.db.get('agents', { id });
+    const agent = await this.db.get('agents', { id });
     if (!agent) throw new Error(`Agent not found: ${id}`);
 
     const currentStatus = agent['status'] as string;
@@ -117,13 +117,13 @@ export class AgentRegistry {
       );
     }
 
-    this.db.update('agents', { id }, {
+    await this.db.update('agents', { id }, {
       status: newStatus,
       updated_at: new Date().toISOString(),
     });
 
     if (WRITE_ACTIVITY_LOG_STATUSES.has(newStatus)) {
-      this.db.insert('activity_log', {
+      await this.db.insert('activity_log', {
         agent_id: id,
         event_type: `agent.${newStatus}`,
         payload: JSON.stringify({ agentId: id, status: newStatus }),
@@ -132,7 +132,7 @@ export class AgentRegistry {
   }
 
   async terminate(id: string): Promise<void> {
-    const agent = this.db.get('agents', { id });
+    const agent = await this.db.get('agents', { id });
     if (!agent) throw new Error(`Agent not found: ${id}`);
 
     const currentStatus = agent['status'] as string;
@@ -141,13 +141,13 @@ export class AgentRegistry {
       return;
     }
 
-    this.db.update('agents', { id }, {
+    await this.db.update('agents', { id }, {
       status: 'terminated',
       deleted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
 
-    this.db.insert('activity_log', {
+    await this.db.insert('activity_log', {
       agent_id: id,
       event_type: 'agent.terminated',
       payload: JSON.stringify({ agentId: id }),

@@ -47,7 +47,7 @@ export class UpdateManager {
       backupPath = await this.backupManager.backup();
 
       for (const update of filtered) {
-        const row = this.db.insert('update_history', {
+        const row = await this.db.insert('update_history', {
           from_version: update.installedVersion,
           to_version: update.latestVersion,
           status: 'pending',
@@ -61,14 +61,14 @@ export class UpdateManager {
       });
 
       for (const id of historyIds) {
-        this.db.update('update_history', { id }, { status: 'succeeded' });
+        await this.db.update('update_history', { id }, { status: 'succeeded' });
       }
 
       await this.backupManager.cleanup(backupPath);
       await this.hooks.emit('update.completed', { updates: filtered });
     } catch (err) {
       for (const id of historyIds) {
-        this.db.update('update_history', { id }, {
+        await this.db.update('update_history', { id }, {
           status: 'failed',
           migration_log: String(err),
         });

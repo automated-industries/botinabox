@@ -9,17 +9,17 @@ export class SessionManager {
     peerId: string,
     params: Record<string, unknown>,
   ): Promise<string> {
-    const existing = this._find(agentId, channelId, peerId);
+    const existing = await this._find(agentId, channelId, peerId);
 
     if (existing) {
-      this.db.update('sessions', { id: existing['id'] }, {
+      await this.db.update('sessions', { id: existing['id'] }, {
         context: JSON.stringify(params),
         last_message_at: new Date().toISOString(),
         message_count: ((existing['message_count'] as number) ?? 0) + 1,
       });
       return existing['id'] as string;
     } else {
-      const row = this.db.insert('sessions', {
+      const row = await this.db.insert('sessions', {
         agent_id: agentId,
         channel: channelId,
         peer_id: peerId,
@@ -36,7 +36,7 @@ export class SessionManager {
     channelId: string,
     peerId: string,
   ): Promise<Record<string, unknown> | undefined> {
-    const session = this._find(agentId, channelId, peerId);
+    const session = await this._find(agentId, channelId, peerId);
     if (!session) return undefined;
 
     const context = session['context']
@@ -47,9 +47,9 @@ export class SessionManager {
   }
 
   async clear(agentId: string, channelId: string, peerId: string): Promise<void> {
-    const session = this._find(agentId, channelId, peerId);
+    const session = await this._find(agentId, channelId, peerId);
     if (session) {
-      this.db.delete('sessions', { id: session['id'] });
+      await this.db.delete('sessions', { id: session['id'] });
     }
   }
 
@@ -74,12 +74,12 @@ export class SessionManager {
     return false;
   }
 
-  private _find(
+  private async _find(
     agentId: string,
     channelId: string,
     peerId: string,
-  ): Record<string, unknown> | undefined {
-    const rows = this.db.query('sessions', {
+  ): Promise<Record<string, unknown> | undefined> {
+    const rows = await this.db.query('sessions', {
       where: { agent_id: agentId, channel: channelId, peer_id: peerId },
     });
     return rows[0] ?? undefined;

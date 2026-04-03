@@ -10,10 +10,10 @@ let hooks: HookBus;
 let taskQueue: TaskQueue;
 let engine: WorkflowEngine;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = new DataStore({ dbPath: ':memory:' });
   defineCoreTables(db);
-  db.init();
+  await db.init();
   hooks = new HookBus();
   taskQueue = new TaskQueue(db, hooks, { pollIntervalMs: 999999 });
   engine = new WorkflowEngine(db, hooks, taskQueue);
@@ -30,7 +30,7 @@ describe('WorkflowEngine — Story 5.1', () => {
       name: 'My Flow',
       steps: [{ id: 'step-1', name: 'Step 1', taskTemplate: { title: 'Do it', description: 'Desc' } }],
     });
-    const rows = db.query('workflows', { where: { slug: 'my-flow' } });
+    const rows = await db.query('workflows', { where: { slug: 'my-flow' } });
     expect(rows).toHaveLength(1);
     expect(rows[0]!['name']).toBe('My Flow');
   });
@@ -76,11 +76,11 @@ describe('WorkflowEngine — Story 5.1', () => {
     const runId = await engine.start('seq-flow', {});
     expect(typeof runId).toBe('string');
 
-    const run = db.get('workflow_runs', { id: runId });
+    const run = await db.get('workflow_runs', { id: runId });
     expect(run!['status']).toBe('running');
 
     // Only step-1 should be created initially
-    const tasks = db.query('tasks', { where: { workflow_run_id: runId } });
+    const tasks = await db.query('tasks', { where: { workflow_run_id: runId } });
     expect(tasks).toHaveLength(1);
     expect(tasks[0]!['workflow_step_id']).toBe('step-1');
   });
@@ -96,7 +96,7 @@ describe('WorkflowEngine — Story 5.1', () => {
     });
 
     const runId = await engine.start('parallel-flow', {});
-    const tasks = db.query('tasks', { where: { workflow_run_id: runId } });
+    const tasks = await db.query('tasks', { where: { workflow_run_id: runId } });
     expect(tasks).toHaveLength(2); // step-a and step-b
     const stepIds = tasks.map((t) => t['workflow_step_id']);
     expect(stepIds).toContain('step-a');
@@ -113,24 +113,24 @@ describe('WorkflowEngine — Story 5.1', () => {
     });
 
     const runId = await engine.start('seq-complete', {});
-    const tasks1 = db.query('tasks', { where: { workflow_run_id: runId } });
+    const tasks1 = await db.query('tasks', { where: { workflow_run_id: runId } });
     const task1 = tasks1[0]!;
 
     // Mark task1 as done
-    db.update('tasks', { id: task1['id'] }, { status: 'done' });
+    await db.update('tasks', { id: task1['id'] }, { status: 'done' });
 
     // Trigger onStepCompleted
     await engine.onStepCompleted(task1['id'] as string, 'output1');
 
     // Should create task for s2
-    const tasks2 = db.query('tasks', { where: { workflow_run_id: runId } });
+    const tasks2 = await db.query('tasks', { where: { workflow_run_id: runId } });
     expect(tasks2).toHaveLength(2);
 
     const task2 = tasks2.find((t) => t['workflow_step_id'] === 's2')!;
-    db.update('tasks', { id: task2['id'] }, { status: 'done' });
+    await db.update('tasks', { id: task2['id'] }, { status: 'done' });
     await engine.onStepCompleted(task2['id'] as string, 'output2');
 
-    const run = db.get('workflow_runs', { id: runId });
+    const run = await db.get('workflow_runs', { id: runId });
     expect(run!['status']).toBe('completed');
   });
 
@@ -145,25 +145,25 @@ describe('WorkflowEngine — Story 5.1', () => {
     });
 
     const runId = await engine.start('converge-flow', {});
-    const initTasks = db.query('tasks', { where: { workflow_run_id: runId } });
+    const initTasks = await db.query('tasks', { where: { workflow_run_id: runId } });
     expect(initTasks).toHaveLength(2);
 
     // Complete task A
     const taskA = initTasks.find((t) => t['workflow_step_id'] === 'a')!;
-    db.update('tasks', { id: taskA['id'] }, { status: 'done' });
+    await db.update('tasks', { id: taskA['id'] }, { status: 'done' });
     await engine.onStepCompleted(taskA['id'] as string, 'a-done');
 
     // C should not be created yet
-    const afterA = db.query('tasks', { where: { workflow_run_id: runId } });
+    const afterA = await db.query('tasks', { where: { workflow_run_id: runId } });
     expect(afterA).toHaveLength(2); // still just a and b
 
     // Complete task B
     const taskB = initTasks.find((t) => t['workflow_step_id'] === 'b')!;
-    db.update('tasks', { id: taskB['id'] }, { status: 'done' });
+    await db.update('tasks', { id: taskB['id'] }, { status: 'done' });
     await engine.onStepCompleted(taskB['id'] as string, 'b-done');
 
     // C should now be created
-    const afterB = db.query('tasks', { where: { workflow_run_id: runId } });
+    const afterB = await db.query('tasks', { where: { workflow_run_id: runId } });
     expect(afterB).toHaveLength(3);
     expect(afterB.some((t) => t['workflow_step_id'] === 'c')).toBe(true);
   });
@@ -181,7 +181,7 @@ describe('WorkflowEngine — Story 5.1', () => {
     });
 
     const runId = await engine.start('interp-flow', { name: 'World' });
-    const tasks = db.query('tasks', { where: { workflow_run_id: runId } });
+    const tasks = await db.query('tasks', { where: { workflow_run_id: runId } });
     expect(tasks[0]!['title']).toBe('Hello World');
     expect(tasks[0]!['description']).toBe('Run for World');
   });
@@ -201,11 +201,11 @@ describe('WorkflowEngine — Story 5.1', () => {
     });
 
     const runId = await engine.start('output-flow', {});
-    const [task1] = db.query('tasks', { where: { workflow_run_id: runId } });
-    db.update('tasks', { id: task1!['id'] }, { status: 'done' });
+    const [task1] = await db.query('tasks', { where: { workflow_run_id: runId } });
+    await db.update('tasks', { id: task1!['id'] }, { status: 'done' });
     await engine.onStepCompleted(task1!['id'] as string, 'result-xyz');
 
-    const tasks = db.query('tasks', { where: { workflow_run_id: runId } });
+    const tasks = await db.query('tasks', { where: { workflow_run_id: runId } });
     const task2 = tasks.find((t) => t['workflow_step_id'] === 'step2')!;
     expect(task2['title']).toBe('After result-xyz');
   });
@@ -220,11 +220,11 @@ describe('WorkflowEngine — Story 5.1', () => {
     });
 
     const runId = await engine.start('abort-flow', {});
-    const [task1] = db.query('tasks', { where: { workflow_run_id: runId } });
+    const [task1] = await db.query('tasks', { where: { workflow_run_id: runId } });
 
     await engine.onStepFailed(task1!['id'] as string, 'step failed');
 
-    const run = db.get('workflow_runs', { id: runId });
+    const run = await db.get('workflow_runs', { id: runId });
     expect(run!['status']).toBe('failed');
   });
 

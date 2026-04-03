@@ -11,12 +11,12 @@ export async function createConfigRevision(
   after: Record<string, unknown>,
 ): Promise<void> {
   // Get the current max version for this agent and increment
-  const existing = db.query('config_revisions', {
+  const existing = await db.query('config_revisions', {
     where: { notes: agentId },
   });
   const version = existing.length + 1;
 
-  db.insert('config_revisions', {
+  await db.insert('config_revisions', {
     version,
     config_yaml: JSON.stringify({ agentId, before, after }),
     applied_by: agentId,
