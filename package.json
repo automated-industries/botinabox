@@ -1,25 +1,72 @@
 {
   "name": "botinabox",
-  "private": true,
   "version": "0.1.0",
   "description": "Bot in a Box — framework for building multi-agent bots",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./anthropic": {
+      "import": "./dist/providers/anthropic/index.js",
+      "types": "./dist/providers/anthropic/index.d.ts"
+    },
+    "./openai": {
+      "import": "./dist/providers/openai/index.js",
+      "types": "./dist/providers/openai/index.d.ts"
+    },
+    "./ollama": {
+      "import": "./dist/providers/ollama/index.js",
+      "types": "./dist/providers/ollama/index.d.ts"
+    },
+    "./slack": {
+      "import": "./dist/channels/slack/index.js",
+      "types": "./dist/channels/slack/index.d.ts"
+    },
+    "./discord": {
+      "import": "./dist/channels/discord/index.js",
+      "types": "./dist/channels/discord/index.d.ts"
+    },
+    "./webhook": {
+      "import": "./dist/channels/webhook/index.js",
+      "types": "./dist/channels/webhook/index.d.ts"
+    }
+  },
+  "bin": {
+    "botinabox": "./bin/botinabox.mjs"
+  },
   "scripts": {
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "test:run": "pnpm -r --parallel exec vitest run",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "latticesql": "^0.17.0",
+    "yaml": "^2.7.0",
+    "ajv": "^8.17.1"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "openai": "^4.104.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "typescript": "^5.7.2",
     "vitest": "^3.0.0",
     "tsup": "^8.3.5",
-    "@types/node": "^22.10.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "esbuild"
-    ]
+    "@types/node": "^22.10.0",
+    "@types/better-sqlite3": "^7.6.12",
+    "@anthropic-ai/sdk": "^0.52.0",
+    "openai": "^4.104.0"
   }
 }
