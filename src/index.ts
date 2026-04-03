@@ -33,3 +33,4 @@ export * from "./core/orchestrator/adapters/api-adapter.js";
 export * from "./core/orchestrator/adapters/cli-adapter.js";
 export * from "./core/orchestrator/user-registry.js";
 export * from "./core/orchestrator/secret-store.js";
+export * from "./core/orchestrator/claude-stream-parser.js";
