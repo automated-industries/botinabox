@@ -73,7 +73,11 @@ export class DataStore {
    */
   defineEntityContext(name: string, def: EntityContextDef): void {
     this.lattice.defineEntityContext(name, {
-      slug: (row: Row) => row[def.slugColumn] as string,
+      slug: (row: Row) => {
+        const val = row[def.slugColumn];
+        if (val == null) return String(row.id ?? row.name ?? 'unknown');
+        return String(val);
+      },
       directoryRoot: def.directory,
       files: def.files as Record<string, import('latticesql').EntityFileSpec>,
       protectedFiles: def.protectedFiles,
