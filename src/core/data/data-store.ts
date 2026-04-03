@@ -83,7 +83,10 @@ export class DataStore {
       protectedFiles: def.protectedFiles,
       protected: def.protected,
       encrypted: def.encrypted,
-      sourceDefaults: { softDelete: true },
+      // Note: sourceDefaults.softDelete NOT set here because junction tables
+      // (agent_project, rule_agent, etc.) don't have deleted_at columns.
+      // Entity context render functions should add softDelete per-source when targeting
+      // tables that support it.
       index: def.indexFile
         ? {
             outputFile: def.indexFile,
