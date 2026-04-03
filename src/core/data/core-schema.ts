@@ -99,7 +99,7 @@ export function defineCoreTables(db: DataStore): void {
     ],
   });
 
-  db.define("sessions", {
+  db.define("messages", {
     columns: {
       id: "TEXT PRIMARY KEY",
       agent_id: "TEXT NOT NULL",
@@ -112,7 +112,7 @@ export function defineCoreTables(db: DataStore): void {
       expires_at: "TEXT",
     },
     tableConstraints: [
-      "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_agent_channel_peer ON sessions(agent_id, channel, peer_id)",
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_agent_channel_peer ON messages(agent_id, channel, peer_id)",
     ],
   });
 

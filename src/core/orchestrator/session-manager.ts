@@ -12,14 +12,14 @@ export class SessionManager {
     const existing = await this._find(agentId, channelId, peerId);
 
     if (existing) {
-      await this.db.update('sessions', { id: existing['id'] }, {
+      await this.db.update('messages', { id: existing['id'] }, {
         context: JSON.stringify(params),
         last_message_at: new Date().toISOString(),
         message_count: ((existing['message_count'] as number) ?? 0) + 1,
       });
       return existing['id'] as string;
     } else {
-      const row = await this.db.insert('sessions', {
+      const row = await this.db.insert('messages', {
         agent_id: agentId,
         channel: channelId,
         peer_id: peerId,
@@ -49,7 +49,7 @@ export class SessionManager {
   async clear(agentId: string, channelId: string, peerId: string): Promise<void> {
     const session = await this._find(agentId, channelId, peerId);
     if (session) {
-      await this.db.delete('sessions', { id: session['id'] });
+      await this.db.delete('messages', { id: session['id'] });
     }
   }
 
@@ -79,7 +79,7 @@ export class SessionManager {
     channelId: string,
     peerId: string,
   ): Promise<Record<string, unknown> | undefined> {
-    const rows = await this.db.query('sessions', {
+    const rows = await this.db.query('messages', {
       where: { agent_id: agentId, channel: channelId, peer_id: peerId },
     });
     return rows[0] ?? undefined;
