@@ -324,8 +324,7 @@ export class GoogleGmailConnector implements Connector<EmailRecord> {
     const res = await this.gmail.users.messages.get({
       userId: 'me',
       id: messageId,
-      format: 'metadata',
-      metadataHeaders: ['From', 'To', 'Cc', 'Bcc', 'Subject', 'Date'],
+      format: 'full',
     });
 
     const msg = res.data;
@@ -345,10 +344,47 @@ export class GoogleGmailConnector implements Connector<EmailRecord> {
       bcc: parseAddressList(getHeader('Bcc')),
       date: new Date(getHeader('Date')).toISOString(),
       snippet: msg.snippet ?? '',
+      body: extractPlainTextBody(msg.payload),
       labels: msg.labelIds ?? [],
       isRead: !(msg.labelIds ?? []).includes('UNREAD'),
     };
   }
+}
+
+// ── MIME body extraction ──────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractPlainTextBody(payload: any): string | undefined {
+  if (!payload) return undefined;
+
+  // Single-part message: body is directly on the payload
+  if (payload.mimeType === 'text/plain' && payload.body?.data) {
+    return decodeBase64Url(payload.body.data);
+  }
+
+  // Multipart: recurse through parts, prefer text/plain
+  if (payload.parts) {
+    // First pass: look for text/plain
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/plain' && part.body?.data) {
+        return decodeBase64Url(part.body.data);
+      }
+    }
+    // Second pass: recurse into nested multipart
+    for (const part of payload.parts) {
+      if (part.mimeType?.startsWith('multipart/')) {
+        const result = extractPlainTextBody(part);
+        if (result) return result;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function decodeBase64Url(data: string): string {
+  const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(base64, 'base64').toString('utf-8');
 }
 
 // ── Address parsing utilities ──────────────────────────────────────
