@@ -75,6 +75,11 @@ export interface AgentConfig {
 export interface BotConfig {
   data: DataConfig;
   channels: Record<string, { enabled: boolean; accounts?: Record<string, unknown> } & Record<string, unknown>>;
+  connectors?: Record<string, {
+    enabled: boolean;
+    provider: string;
+    accounts?: Record<string, import("./connector.js").ConnectorConfig>;
+  } & Record<string, unknown>>;
   agents: AgentConfig[];
   providers: Record<string, { enabled: boolean } & Record<string, unknown>>;
   models: ModelConfig;

@@ -6,6 +6,11 @@ interface HeartbeatConfig {
   intervalSec: number;
 }
 
+/**
+ * @deprecated Use {@link Scheduler} from `botinabox` instead.
+ * HeartbeatScheduler uses in-memory setInterval which loses state on restart.
+ * The Scheduler class uses database-backed schedules with cron expressions.
+ */
 export class HeartbeatScheduler {
   private timers = new Map<string, ReturnType<typeof setInterval>>();
 
