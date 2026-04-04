@@ -11,9 +11,9 @@ interface RunCompletedPayload {
 }
 
 function calculateCostCents(usage: TokenUsage, model?: ModelInfo): number {
-  if (!model?.costPerInputToken) return 0;
-  const inputCost = usage.inputTokens * model.costPerInputToken;
-  const outputCost = usage.outputTokens * (model.costPerOutputToken ?? 0);
+  if (!model?.inputCostPerMToken) return 0;
+  const inputCost = (usage.inputTokens / 1_000_000) * model.inputCostPerMToken;
+  const outputCost = (usage.outputTokens / 1_000_000) * (model.outputCostPerMToken ?? 0);
   return Math.round((inputCost + outputCost) * 100);
 }
 

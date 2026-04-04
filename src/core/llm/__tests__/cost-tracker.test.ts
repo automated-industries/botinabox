@@ -11,8 +11,8 @@ const MODEL_CATALOG: ModelInfo[] = [
     displayName: "Claude Sonnet 4.6",
     contextWindow: 200_000,
     maxOutputTokens: 16_000,
-    costPerInputToken: 0.000003,
-    costPerOutputToken: 0.000015,
+    inputCostPerMToken: 3,
+    outputCostPerMToken: 15,
     capabilities: ["chat"],
   },
 ];
