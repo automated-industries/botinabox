@@ -1,13 +1,15 @@
 # Orchestration
 
-The orchestration layer manages agents, tasks, runs, workflows, and budget controls.
+The orchestration layer manages agents, tasks, runs, workflows, budgets, schedules, sessions, users, and secrets. Every component takes a `DataStore` and `HookBus` as constructor dependencies and communicates through hook events.
 
-## Agents
+## 1. AgentRegistry
 
-### Agent Registry
+Manages agent lifecycle: registration, lookup, status transitions, and permissions.
+
+### Registration
 
 ```typescript
-import { AgentRegistry } from '@botinabox/core';
+import { AgentRegistry } from 'botinabox';
 
 const agents = new AgentRegistry(db, hooks);
 
@@ -16,272 +18,350 @@ const agentId = await agents.register({
   slug: 'researcher',
   name: 'Research Agent',
   adapter: 'api',
+  role: 'research',
   model: 'smart',
-  role: 'general',
-  budgetMonthlyCents: 5000,
 });
+// Emits: 'agent.created' { agentId, slug }
+```
 
-// Lookup
+Required fields: `slug`, `name`, `adapter`. All other fields are optional.
+
+### Lookup and Listing
+
+```typescript
+// By ID
 const agent = await agents.getById(agentId);
+
+// By slug
 const agent = await agents.getBySlug('researcher');
 
-// List with filters
-const active = await agents.list({ status: 'idle' });
-const admins = await agents.list({ role: 'admin' });
+// List all agents
+const all = await agents.list();
 
-// Update
-await agents.update(agentId, { status: 'paused' });
+// Filter by status and/or role
+const idle = await agents.list({ status: 'idle' });
+const devs = await agents.list({ role: 'engineering' });
 ```
 
-### Agent State Machine
+### Status Transitions
+
+Agents follow a state machine with validated transitions:
 
 ```
         ┌──────────┐
-        │   idle    │◄──────────────┐
-        └────┬─────┘               │
-             │ task assigned        │ run completes
-             ▼                     │
-        ┌──────────┐          ┌────┴─────┐
-        │ running   │─────────►│  idle     │
-        └────┬─────┘          └──────────┘
-             │ pause
-             ▼
-        ┌──────────┐
-        │  paused   │
-        └────┬─────┘
-             │ terminate
-             ▼
-        ┌──────────┐
-        │terminated │  (terminal)
-        └──────────┘
+        │   idle    │◄────────────┐
+        └────┬──┬──┘             │
+             │  │                │
+   ┌─────────┘  └────────┐      │
+   │ (run starts)        │      │ (run completes / resume)
+   ▼                     ▼      │
+┌──────────┐       ┌──────────┐ │
+│ running   │──────►│  paused   │─┘
+└────┬─────┘       └────┬─────┘
+     │                  │
+     ▼                  ▼
+┌──────────────────────────┐
+│       terminated          │  (terminal -- no transitions out)
+└──────────────────────────┘
 ```
 
-Valid transitions: `idle→running`, `idle→paused`, `running→idle`, `running→paused`, `running→terminated`, `paused→idle`, `paused→terminated`.
+Valid transitions:
 
-### Agent-Created Agents
-
-Agents with `canCreateAgents: true` can register new agents at runtime:
+| From | Allowed To |
+|------|-----------|
+| `idle` | `running`, `paused` |
+| `running` | `idle`, `paused`, `terminated` |
+| `paused` | `idle`, `terminated` |
+| `terminated` | (none) |
 
 ```typescript
-await agents.register(
-  { slug: 'sub-agent', name: 'Sub Agent', adapter: 'api' },
-  { actorAgentId: parentAgentId }
+// Transition status (validates against the state machine)
+await agents.setStatus(agentId, 'running');
+await agents.setStatus(agentId, 'paused');
+// Emits 'agent.paused' for paused/terminated transitions
+
+// Terminate (shortcut -- works from any non-terminal state)
+await agents.terminate(agentId);
+// Sets status='terminated', deleted_at=now
+```
+
+Invalid transitions throw an error:
+
+```typescript
+await agents.setStatus(agentId, 'running');
+await agents.setStatus(agentId, 'idle');    // OK
+await agents.setStatus(agentId, 'terminated');
+await agents.setStatus(agentId, 'running'); // Error: Invalid status transition
+```
+
+### Agent-Created Agents (Permissions)
+
+Agents with `canCreateAgents: true` in their config can register new agents at runtime. The creating agent's ID is recorded in the activity log.
+
+```typescript
+// Parent agent must have canCreateAgents: true in adapter_config
+const childId = await agents.register(
+  {
+    slug: 'sub-researcher',
+    name: 'Sub-Research Agent',
+    adapter: 'api',
+    model: 'fast',
+  },
+  { actorAgentId: parentAgentId },
 );
+// Activity log records: agent_created_by_agent event
 ```
 
-The `actorAgentId` is recorded in the audit log.
-
-## Tasks
-
-### Task Queue
+If the actor does not have permission, the call throws:
 
 ```typescript
-import { TaskQueue } from '@botinabox/core';
+// Throws: "Agent {id} does not have permission to create agents"
+```
+
+### Seeding from Config
+
+On startup, seed agents from the YAML config. Existing agents (by slug) are skipped -- database values take precedence.
+
+```typescript
+await agents.seedFromConfig([
+  { slug: 'researcher', name: 'Research Agent', adapter: 'api' },
+  { slug: 'builder', name: 'Build Agent', adapter: 'cli' },
+]);
+```
+
+### Update and Config Revisions
+
+```typescript
+// Update agent fields (creates a config revision for audit)
+await agents.update(agentId, { model: 'balanced', role: 'senior-research' });
+```
+
+## 2. TaskQueue
+
+Creates and manages tasks. Polls for eligible work and emits wakeup events.
+
+### Creating Tasks
+
+```typescript
+import { TaskQueue } from 'botinabox';
 
 const tasks = new TaskQueue(db, hooks, {
-  pollIntervalMs: 30000,       // How often to check for eligible tasks
-  staleThresholdMs: 7200000,   // Mark tasks stale after 2 hours
+  pollIntervalMs: 30_000,       // How often to check for eligible tasks
+  staleThresholdMs: 300_000,    // 5 minutes
 });
 
 // Create a task
 const taskId = await tasks.create({
   title: 'Research market trends',
-  description: 'Analyze Q1 2026 market data and summarize findings',
+  description: 'Analyze Q1 data and summarize findings',
   assignee_id: agentId,
-  priority: 30,                // Lower = higher priority (default 50)
+  priority: 30,                  // Lower = higher priority (default 5)
 });
+// Emits: 'task.created' { taskId, title }
+```
 
-// Update
+### Task Statuses and Transitions
+
+| Status | Meaning |
+|--------|---------|
+| `backlog` | Created but not ready for work |
+| `todo` | Ready to be picked up by an agent |
+| `in_progress` | Currently executing in a run |
+| `in_review` | Awaiting review |
+| `done` | Completed successfully |
+| `blocked` | Waiting on a dependency |
+| `cancelled` | Manually cancelled |
+| `failed` | Retries exhausted |
+
+The typical lifecycle:
+
+```
+backlog ──► todo ──► in_progress ──► done
+                         │
+                         ├──► failed (retries exhausted)
+                         │
+                         └──► todo (retry scheduled)
+```
+
+### Priority
+
+Priority is numeric. Lower values run first. Default is 5.
+
+```typescript
+await tasks.create({ title: 'Critical', priority: 1 });   // Runs first
+await tasks.create({ title: 'Normal', priority: 5 });     // Default
+await tasks.create({ title: 'Low', priority: 90 });       // Runs last
+```
+
+### Update and Query
+
+```typescript
+// Update any fields
 await tasks.update(taskId, { status: 'in_progress' });
+await tasks.update(taskId, { priority: 1 });
 
-// Get
+// Get by ID
 const task = await tasks.get(taskId);
 
 // List with filters
 const pending = await tasks.list({ status: 'todo' });
 const myTasks = await tasks.list({ assignee_id: agentId });
+const all = await tasks.list();
+```
 
-// Start/stop polling
+### Polling
+
+When polling is active, the TaskQueue periodically scans for `todo` tasks with an `assignee_id` that have no active run, and emits `agent.wakeup` for each.
+
+```typescript
+// Start polling (checks every pollIntervalMs)
 tasks.startPolling();
+
+// Stop polling
 tasks.stopPolling();
 ```
 
-### Task Statuses
+### Chain Depth
 
-| Status | Description |
-|--------|-------------|
-| `backlog` | Created but not ready |
-| `todo` | Ready to be picked up |
-| `in_progress` | Currently executing |
-| `in_review` | Awaiting review |
-| `done` | Completed successfully |
-| `blocked` | Waiting on dependency |
-| `cancelled` | Cancelled |
-
-### Priority
-
-Priority is numeric, lower = higher priority. Default is 50.
-
-```typescript
-await tasks.create({ title: 'Urgent', priority: 10 });   // Runs first
-await tasks.create({ title: 'Normal', priority: 50 });   // Default
-await tasks.create({ title: 'Low', priority: 90 });      // Runs last
-```
-
-### Retry Policies
-
-Tasks can define retry behavior for failed runs:
+Tasks track chain depth to prevent infinite followup loops. The `MAX_CHAIN_DEPTH` (default 5) is enforced on creation.
 
 ```typescript
 await tasks.create({
-  title: 'Flaky operation',
-  retryPolicy: {
-    maxRetries: 3,
-    backoffMs: 1000,           // Initial backoff
-    backoffMultiplier: 2,      // Exponential: 1s, 2s, 4s
-    maxBackoffMs: 300000,      // Cap at 5 minutes
-  },
+  title: 'Step in a chain',
+  chain_depth: 3,
+  chain_origin_id: 'root-task-uuid',
 });
+// Throws if chain_depth > MAX_CHAIN_DEPTH
 ```
 
-The `RunManager` handles retries automatically — failed runs reschedule the task with exponential backoff.
+## 3. RunManager
 
-### Followup Chains
+Manages execution runs: locking, starting, finishing, retry logic, followup chain creation, and orphan reaping.
 
-Tasks can trigger follow-up tasks on completion, creating multi-agent workflows:
-
-```typescript
-await tasks.create({
-  title: 'Write draft',
-  assignee_id: writerAgentId,
-  followupAgentId: reviewerAgentId,
-  followupTemplate: 'Review the draft: {{completedOutput}}',
-});
-```
-
-When the writer finishes, a new task is automatically created for the reviewer with the writer's output embedded in the description.
-
-**Chain depth limits** prevent infinite chains (default max: 5):
+### Starting and Finishing Runs
 
 ```typescript
-// Chain metadata is tracked automatically
-{
-  chainOriginId: 'original-task-id',  // Root task
-  chainDepth: 2,                       // Current depth
-}
-```
-
-### Task Dependencies
-
-Tasks can depend on other tasks:
-
-```typescript
-const taskA = await tasks.create({ title: 'Step A' });
-const taskB = await tasks.create({
-  title: 'Step B',
-  dependsOn: [taskA],  // Won't execute until A completes
-});
-```
-
-## Runs
-
-### Run Manager
-
-```typescript
-import { RunManager } from '@botinabox/core';
+import { RunManager } from 'botinabox';
 
 const runs = new RunManager(db, hooks, {
-  staleThresholdMs: 1800000,  // 30 minutes
-  maxBackoffMs: 300000,       // 5 minutes max retry backoff
+  staleThresholdMs: 30 * 60 * 1000,  // 30 minutes
+  maxBackoffMs: 5 * 60 * 1000,       // 5 minutes max retry backoff
 });
 
-// Check if agent is locked (already running)
-const busy = runs.isLocked(agentId);
+// Check if agent is locked (one run at a time per agent)
+const busy = runs.isLocked(agentId);  // boolean
 
-// Start a run
+// Start a run (acquires lock)
 const runId = await runs.startRun(agentId, taskId, 'api');
+// Throws if agent already has an active run
 
-// Finish a run
+// Finish a run (releases lock, processes result)
 await runs.finishRun(runId, {
-  exitCode: 0,                // 0 = success, non-zero = failure
-  output: 'Analysis complete',
+  exitCode: 0,                  // 0 = success, non-zero = failure
+  output: 'Analysis complete. Key findings: ...',
   costCents: 12,
   usage: { inputTokens: 5000, outputTokens: 2000 },
 });
+// Emits: 'run.completed' { runId, agentId, taskId, status, exitCode }
 ```
 
-Run statuses: `queued`, `running`, `succeeded`, `failed`, `cancelled`.
+### Retry with Exponential Backoff
 
-### Execution Adapters
+When a run fails (exitCode !== 0), RunManager checks the task's retry policy:
 
-Two built-in execution adapters:
+```
+Backoff = min(BASE_BACKOFF_MS * 2^retryCount, maxBackoffMs)
 
-**API Adapter** — Runs tasks via LLM API calls with tool loop:
+Retry 0: 5 seconds
+Retry 1: 10 seconds
+Retry 2: 20 seconds
+Retry 3: 40 seconds
+...capped at maxBackoffMs (default 5 minutes)
+```
 
 ```typescript
-const apiAdapter = new ApiExecutionAdapter(modelRouter);
-
-const result = await apiAdapter.execute({
-  agent: { id: agentId, model: 'smart' },
-  task: { description: 'Analyze this data...' },
-  sessionParams: { history: previousMessages },
-  contextFiles: ['./context/agents/researcher/AGENT.md'],
+// Create a task with retry policy
+await tasks.create({
+  title: 'Flaky API call',
+  assignee_id: agentId,
+  max_retries: 3,
 });
 
-// result.output — LLM response text
-// result.usage — Token counts
-// result.sessionParams — Updated session state
+// When the run fails, RunManager automatically:
+// 1. Increments retry_count
+// 2. Computes next_retry_at with exponential backoff
+// 3. Resets task status to 'todo'
+// 4. Clears execution_run_id
+
+// After max_retries exhausted:
+// Task status set to 'failed'
 ```
 
-**CLI Adapter** — Runs tasks as subprocesses:
+### Followup Chains
+
+When a run succeeds and the task has a `followup_agent_id`, RunManager automatically creates a followup task for the next agent.
 
 ```typescript
-const cliAdapter = new CliExecutionAdapter();
-
-const result = await cliAdapter.execute({
-  agent: { id: agentId, cwd: './projects/my-app', skip_permissions: true },
-  task: { title: 'Run tests', description: 'Execute the test suite' },
-  logPath: './data/runs/run-123.ndjson',
+// Create a task with followup
+await tasks.create({
+  title: 'Write draft report',
+  assignee_id: writerAgentId,
+  followup_agent_id: reviewerAgentId,
+  followup_template: 'Review this draft: {{output}}',
 });
 
-// result.output — Process stdout
-// result.exitCode — Process exit code
+// When the writer's run succeeds:
+// 1. Task marked 'done' with result
+// 2. New task created for reviewer:
+//    - title: "Review this draft: <writer's output>"
+//    - chain_depth: parentDepth + 1
+//    - chain_origin_id: original task ID (or parent's chain_origin_id)
+// 3. Emits 'task.followup.created'
 ```
 
-### Run Logging
+The `{{output}}` placeholder in `followup_template` is replaced with the completing run's output. If no template is set, the default is `'Followup: {{output}}'`.
 
-Runs are logged in NDJSON format:
+Chain depth is incremented on each followup. If it exceeds `MAX_CHAIN_DEPTH` (5), the chain is halted with an error.
+
+### Orphan Reaping
+
+Runs that have been in `running` status for longer than `staleThresholdMs` are reaped as failed orphans.
 
 ```typescript
-import { NdjsonLogger } from '@botinabox/core';
+// Manually trigger orphan reaping
+await runs.reapOrphans();
 
-const logger = new NdjsonLogger('./data/runs/run-123.ndjson');
-logger.log('stdout', 'Processing...\n');
-logger.log('stderr', 'Warning: low memory\n');
-logger.close();
+// Start automatic reaping on an interval
+runs.startOrphanReaper(60_000);  // Check every minute
+
+// Stop
+runs.stopOrphanReaper();
 ```
 
-Each line is a JSON object:
+### Run Statuses
 
-```json
-{"timestamp":"2026-04-03T12:00:00.000Z","stream":"stdout","chunk":"Processing...\n"}
-```
+| Status | Meaning |
+|--------|---------|
+| `queued` | Created, waiting to start |
+| `running` | Currently executing |
+| `succeeded` | Completed with exitCode 0 |
+| `failed` | Completed with non-zero exitCode or reaped |
+| `cancelled` | Manually cancelled |
 
-## Workflows
+## 4. WorkflowEngine
 
-Workflows define multi-step processes as directed acyclic graphs (DAGs).
+Defines and executes multi-step workflows as directed acyclic graphs (DAGs). Steps can run sequentially or in parallel based on dependency declarations.
 
 ### Defining a Workflow
 
 ```typescript
-import { WorkflowEngine } from '@botinabox/core';
+import { WorkflowEngine } from 'botinabox';
 
-const workflows = new WorkflowEngine(db, hooks, taskQueue);
+const workflows = new WorkflowEngine(db, hooks, tasks);
 
 await workflows.define('deploy-pipeline', {
-  slug: 'deploy-pipeline',
   name: 'Deploy Pipeline',
-  description: 'Build, test, and deploy',
+  description: 'Build, test, and deploy an application',
   steps: [
     {
       id: 'build',
@@ -289,24 +369,24 @@ await workflows.define('deploy-pipeline', {
       agentSlug: 'builder',
       taskTemplate: {
         title: 'Build project',
-        description: 'Run the build process',
+        description: 'Run the build process for {{branch}}',
       },
     },
     {
       id: 'test',
       name: 'Test',
       agentSlug: 'tester',
-      dependsOn: ['build'],         // Runs after build
+      dependsOn: ['build'],
       taskTemplate: {
         title: 'Run tests',
-        description: 'Execute test suite',
+        description: 'Execute test suite against build output',
       },
     },
     {
       id: 'security-scan',
       name: 'Security Scan',
       agentSlug: 'scanner',
-      dependsOn: ['build'],         // Also runs after build (parallel with test)
+      dependsOn: ['build'],
       taskTemplate: {
         title: 'Security scan',
         description: 'Scan for vulnerabilities',
@@ -316,10 +396,10 @@ await workflows.define('deploy-pipeline', {
       id: 'deploy',
       name: 'Deploy',
       agentSlug: 'deployer',
-      dependsOn: ['test', 'security-scan'],  // Runs after both complete
+      dependsOn: ['test', 'security-scan'],
       taskTemplate: {
         title: 'Deploy to production',
-        description: 'Deploy the built artifact',
+        description: 'Deploy using output from {{steps.build.output}}',
       },
       onFail: 'abort',
     },
@@ -327,181 +407,681 @@ await workflows.define('deploy-pipeline', {
 });
 ```
 
-### Running a Workflow
+### Dependency Resolution and Parallel Execution
 
-```typescript
-// Start a workflow run
-const workflowRunId = await workflows.start('deploy-pipeline', {
-  branch: 'main',
-  commit: 'abc123',
-});
-
-// advance() is called automatically when tasks complete
-// You can also call it manually:
-await workflows.advance(workflowRunId);
-```
-
-### Step Options
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `id` | `string` | required | Unique step identifier |
-| `name` | `string` | required | Display name |
-| `agentSlug` | `string` | — | Agent to execute this step |
-| `agentResolver` | `string` | — | Dynamic agent selection expression |
-| `taskTemplate` | `object` | required | Task title + description template |
-| `dependsOn` | `string[]` | `[]` | Step IDs that must complete first |
-| `onComplete` | `string` | `"next"` | `"next"`, `"parallel"`, or `"end"` |
-| `onFail` | `string` | `"abort"` | `"abort"`, `"skip"`, or `"retry"` |
-| `retryPolicy` | `object` | — | Retry config for this step |
-| `condition` | `string` | — | Condition expression to evaluate |
-
-### Validation
-
-The workflow engine validates definitions before accepting them:
-
-- No duplicate step IDs
-- No references to undefined steps in `dependsOn`
-- No cyclic dependencies (topologically sorted)
-
-### Execution Order
-
-Steps with no dependencies run first. Steps run in parallel when their dependencies are all satisfied. The engine uses topological sorting to determine valid execution order.
+Steps with no `dependsOn` (or empty array) run first. Steps run as soon as all their dependencies are satisfied, enabling parallel execution.
 
 ```
 build ──► test ──────────► deploy
      └──► security-scan ──┘
 ```
 
-In this DAG, `build` runs first, then `test` and `security-scan` run in parallel, then `deploy` runs after both complete.
+In this DAG, `build` runs first. Then `test` and `security-scan` run in parallel. `deploy` runs only after both complete.
 
-## Budget Controls
+### Validation
 
-### Per-Agent Budgets
+The engine validates definitions before accepting them:
 
-Set a monthly cost cap per agent:
-
-```yaml
-agents:
-  - slug: researcher
-    budgetMonthlyCents: 5000   # $50/month cap
-```
-
-### Budget Controller
+- **No duplicate step IDs** -- throws if two steps share the same `id`.
+- **No undefined dependencies** -- throws if `dependsOn` references a step that does not exist.
+- **No cycles** -- uses DFS cycle detection to reject circular dependencies.
 
 ```typescript
-import { BudgetController } from '@botinabox/core';
-
-const budgets = new BudgetController(db, hooks);
-
-// Check if an agent can run
-const check = await budgets.checkBudget(agentId);
-// → { allowed: true, currentSpendCents: 2300, limitCents: 5000 }
-// → { allowed: false, reason: 'Monthly budget exceeded', ... }
-
-// Global check (across all agents)
-const global = await budgets.globalCheck();
-
-// Reset monthly spend (e.g., on month boundary)
-await budgets.resetMonthlySpend(agentId);
-```
-
-### Budget Behavior
-
-| Spend Level | Behavior |
-|-------------|----------|
-| Below `warnPercent` | `allowed: true`, status `ok` |
-| At `warnPercent` threshold | `allowed: true`, status `warning`, emits `budget.exceeded` hook |
-| At or above limit | `allowed: false`, status `hard_stop` |
-| No limit set (≤0) | Always allowed |
-
-Listen for budget warnings:
-
-```typescript
-hooks.register('budget.exceeded', async (ctx) => {
-  console.warn(`Agent ${ctx.agentId} at ${ctx.spentCents}/${ctx.limitCents} cents`);
-  // Send alert, pause agent, etc.
+// This throws: "Workflow has cyclic step dependencies"
+await workflows.define('bad', {
+  name: 'Bad',
+  steps: [
+    { id: 'a', name: 'A', dependsOn: ['b'], taskTemplate: { title: 'A', description: '' } },
+    { id: 'b', name: 'B', dependsOn: ['a'], taskTemplate: { title: 'B', description: '' } },
+  ],
 });
 ```
 
-## Wakeups and Heartbeats
-
-### Wakeup Queue
-
-Agents can be woken up by external events or scheduled heartbeats:
+### Starting a Workflow
 
 ```typescript
-import { WakeupQueue } from '@botinabox/core';
+const workflowRunId = await workflows.start('deploy-pipeline', {
+  branch: 'main',
+  commit: 'abc123',
+});
+// Creates workflow_run record with status='running'
+// Dispatches initial steps (no dependencies) as tasks
+```
+
+The `context` object is available in task templates via `{{key}}` interpolation.
+
+### Step Completion and Advancement
+
+The engine listens for `task.completed` events. When a task with a `workflow_run_id` completes:
+
+1. The step result is recorded in `step_results`.
+2. The engine finds steps whose dependencies are now all satisfied.
+3. Newly eligible steps are dispatched as tasks.
+4. If all steps are complete, the workflow run is marked `completed`.
+
+Previous step outputs are available in subsequent step templates as `{{steps.stepId.output}}`.
+
+### Failure Handling
+
+Each step has an `onFail` policy:
+
+| Policy | Behavior |
+|--------|----------|
+| `abort` | Mark the entire workflow run as `failed` (default) |
+| `skip` | Continue to the next eligible steps |
+| `retry` | Use the step's retry policy via RunManager |
+
+```typescript
+{
+  id: 'deploy',
+  name: 'Deploy',
+  onFail: 'abort',  // Abort entire workflow if deploy fails
+  // ...
+}
+```
+
+### Step Options Reference
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `id` | `string` | required | Unique step identifier |
+| `name` | `string` | required | Display name |
+| `agentSlug` | `string` | -- | Agent to execute this step |
+| `taskTemplate` | `object` | required | `{ title, description }` with `{{var}}` interpolation |
+| `dependsOn` | `string[]` | `[]` | Step IDs that must complete first |
+| `onComplete` | `string` | `"next"` | `"next"`, `"parallel"`, or `"end"` |
+| `onFail` | `string` | `"abort"` | `"abort"`, `"skip"`, or `"retry"` |
+| `retryPolicy` | `object` | -- | `{ maxRetries, backoffMs, backoffMultiplier, maxBackoffMs }` |
+
+### Workflow Triggers
+
+Workflows can declare a trigger in their definition:
+
+```typescript
+await workflows.define('on-pr-merge', {
+  name: 'Post-Merge Pipeline',
+  trigger: {
+    type: 'event',
+    filter: { event: 'pull_request.merged' },
+  },
+  steps: [/* ... */],
+});
+```
+
+Trigger types: `task_completed`, `event`, `schedule`, `manual`.
+
+## 5. BudgetController
+
+Enforces per-agent and global cost limits with warning thresholds and hard stops.
+
+### Per-Agent Budget Check
+
+```typescript
+import { BudgetController } from 'botinabox';
+
+const budgets = new BudgetController(db, hooks);
+
+const check = await budgets.checkBudget(agentId);
+// Returns:
+// {
+//   allowed: true,
+//   currentSpendCents: 2300,
+//   limitCents: 5000,
+// }
+
+// When spend exceeds warnPercent (default 80%):
+// Emits 'budget.exceeded' with { agentId, currentSpendCents, limitCents, warnPercent }
+// Still returns allowed: true
+
+// When spend >= limitCents:
+// Returns:
+// {
+//   allowed: false,
+//   reason: 'Monthly budget exceeded',
+//   currentSpendCents: 5200,
+//   limitCents: 5000,
+// }
+```
+
+### Budget Behavior Table
+
+| Spend Level | `allowed` | Hook Emitted |
+|-------------|-----------|--------------|
+| Below warn threshold | `true` | none |
+| At or above warn threshold | `true` | `budget.exceeded` |
+| At or above limit | `false` | none (caller should block) |
+| No limit set (0 or unset) | `true` | never |
+
+### Global Budget Check
+
+```typescript
+const global = await budgets.globalCheck();
+// {
+//   allowed: true,
+//   totalSpentCents: 15200,    // Sum across all agents
+//   limitCents: 100000,        // From global budget_policies
+// }
+```
+
+### Reset Monthly Spend
+
+```typescript
+// Call on month boundary (e.g., via Scheduler)
+await budgets.resetMonthlySpend(agentId);
+// Sets spent_monthly_cents = 0
+```
+
+### Listening for Budget Warnings
+
+```typescript
+hooks.register('budget.exceeded', async (ctx) => {
+  console.warn(ctx.message);
+  // "Budget warning: 4200 of 5000 cents used (80% threshold)"
+
+  // Take action: alert admin, pause agent, etc.
+  await agents.setStatus(ctx.agentId, 'paused');
+});
+```
+
+## 6. WakeupQueue
+
+Signals agents to wake up and check for work. Supports coalescing to avoid duplicate wakeups.
+
+### Enqueue a Wakeup
+
+```typescript
+import { WakeupQueue } from 'botinabox';
 
 const wakeups = new WakeupQueue(db);
 
-// Queue a wakeup
-await wakeups.enqueue(agentId, 'task-completed', { taskId: '...' });
+// Queue a wakeup with source and optional context
+const wakeupId = await wakeups.enqueue(agentId, 'task-completed', {
+  taskId: 'abc-123',
+  reason: 'New work available',
+});
+```
 
-// Coalesce: merge with existing pending wakeup (avoid duplicates)
-await wakeups.coalesce(agentId, { reason: 'new-messages' });
+### Coalesce Wakeups
 
-// Get next pending wakeup
+If an agent already has a pending (unfired) wakeup, coalesce merges the new context into the existing one instead of creating a duplicate.
+
+```typescript
+// If a pending wakeup exists, merge context into it
+await wakeups.coalesce(agentId, { reason: 'additional-messages' });
+// Existing wakeup context: { source: 'poll' }
+// After coalesce: { source: 'poll', reason: 'additional-messages' }
+
+// If no pending wakeup exists, this is a no-op
+```
+
+### Get Next and Mark Fired
+
+```typescript
+// Get the oldest pending wakeup for an agent
 const next = await wakeups.getNext(agentId);
+// Returns the wakeup row or undefined if none pending
 
-// Mark as fired
-await wakeups.markFired(next.id, runId);
+if (next) {
+  // Start a run, then mark the wakeup as fired
+  const runId = await runs.startRun(agentId, taskId);
+  await wakeups.markFired(next.id as string, runId);
+  // Sets fired_at and run_id on the wakeup record
+}
 ```
 
-### Heartbeat Scheduler
+## 7. Scheduler
 
-Periodically wake agents to check for work:
+Database-backed job scheduling with cron expressions. Supports both recurring and one-time schedules with timezone support.
+
+### Register a Recurring Schedule
 
 ```typescript
-import { HeartbeatScheduler } from '@botinabox/core';
+import { Scheduler } from 'botinabox';
 
-const heartbeats = new HeartbeatScheduler(wakeupQueue, hooks);
+const scheduler = new Scheduler(db, hooks);
 
-heartbeats.start([
-  {
-    id: agentId,
-    heartbeat_config: JSON.stringify({
-      enabled: true,
-      intervalSec: 300,  // Every 5 minutes
-    }),
+// Register a recurring schedule with a cron expression
+const scheduleId = await scheduler.register({
+  name: 'daily-sync',
+  description: 'Sync external data every morning',
+  cron: '0 9 * * *',            // Every day at 9:00 AM
+  timezone: 'America/New_York',  // Default: 'UTC'
+  action: 'connector.sync',     // Hook event name to emit when fired
+  actionConfig: {                // Payload passed to the hook
+    connector: 'gmail',
+    account: 'main',
   },
-]);
-
-// Stop all heartbeats
-heartbeats.stop();
+});
 ```
 
-## Dependency Resolution
-
-Utility functions for validating workflow step dependencies:
+### Register a One-Time Schedule
 
 ```typescript
-import { detectCycle, topologicalSort } from '@botinabox/core';
+const scheduleId = await scheduler.register({
+  name: 'deploy-friday',
+  description: 'Deploy on Friday at 5pm',
+  runAt: '2026-04-10T17:00:00Z',   // ISO 8601 datetime
+  action: 'workflow.start',
+  actionConfig: {
+    workflowSlug: 'deploy-pipeline',
+    branch: 'main',
+  },
+});
+// One-time schedules are auto-disabled after firing
+```
+
+### Cron Syntax
+
+Standard 5-field cron expressions:
+
+```
+┌───────────── minute (0-59)
+│ ┌───────────── hour (0-23)
+│ │ ┌───────────── day of month (1-31)
+│ │ │ ┌───────────── month (1-12)
+│ │ │ │ ┌───────────── day of week (0-7, 0 and 7 = Sunday)
+│ │ │ │ │
+* * * * *
+```
+
+Examples:
+- `0 9 * * *` -- every day at 9:00 AM
+- `*/15 * * * *` -- every 15 minutes
+- `0 0 1 * *` -- first day of every month at midnight
+- `0 9 * * 1-5` -- weekdays at 9:00 AM
+
+### Starting and Stopping the Scheduler
+
+```typescript
+// Start polling for due schedules (default: every 30 seconds)
+await scheduler.start(30_000);
+
+// Stop
+scheduler.stop();
+```
+
+When started, the scheduler:
+1. Computes `next_fire_at` for schedules missing it.
+2. Polls on interval for schedules where `next_fire_at <= now`.
+3. Emits the schedule's `action` as a hook event with `actionConfig` as payload.
+4. For recurring: computes the next fire time from the cron expression.
+5. For one-time: disables the schedule after firing.
+
+### Update and Unregister
+
+```typescript
+// Update schedule
+await scheduler.update(scheduleId, {
+  cron: '0 8 * * *',           // Change to 8 AM
+  timezone: 'Europe/London',
+  enabled: false,               // Disable without deleting
+});
+
+// Soft-delete
+await scheduler.unregister(scheduleId);
+```
+
+### Listing Schedules
+
+```typescript
+// List all active schedules
+const active = await scheduler.list({ enabled: true });
+
+// Filter by action
+const syncs = await scheduler.list({ action: 'connector.sync' });
+```
+
+### Schedule Hook Events
+
+| Event | Payload | When |
+|-------|---------|------|
+| `{action}` | `{ schedule_id, schedule_name, ...actionConfig }` | Schedule fires |
+| `schedule.fired` | `{ schedule_id, schedule_name, action, fired_at }` | After any schedule fires |
+| `schedule.error` | `{ schedule_id, schedule_name, error }` | Schedule handler throws |
+
+## 8. SessionManager
+
+Manages per-agent/channel/peer session state for maintaining conversation context.
+
+### Save Session
+
+```typescript
+import { SessionManager } from 'botinabox';
+
+const sessions = new SessionManager(db);
+
+// Save or update session (creates if not exists, increments message_count)
+const sessionId = await sessions.save(
+  agentId,
+  'slack',           // channel
+  'U12345',          // peer ID (e.g., Slack user ID)
+  {                  // context params (serialized as JSON)
+    history: [
+      { role: 'user', content: 'Hello' },
+      { role: 'assistant', content: 'Hi there!' },
+    ],
+    topic: 'onboarding',
+  },
+);
+```
+
+### Load Session
+
+```typescript
+const session = await sessions.load(agentId, 'slack', 'U12345');
+// Returns the session row merged with parsed context, or undefined if not found
+// {
+//   id: 'session-uuid',
+//   agent_id: 'agent-uuid',
+//   channel: 'slack',
+//   peer_id: 'U12345',
+//   message_count: 5,
+//   last_message_at: '2026-04-03T12:00:00.000Z',
+//   history: [...],
+//   topic: 'onboarding',
+// }
+```
+
+### Clear Session
+
+```typescript
+await sessions.clear(agentId, 'slack', 'U12345');
+// Deletes the session record
+```
+
+### Session Expiry
+
+Check if a session should be cleared based on age or message count:
+
+```typescript
+const session = await sessions.load(agentId, 'slack', 'U12345');
+if (session) {
+  const shouldClear = await sessions.shouldClear(session, {
+    maxRuns: 50,        // Clear after 50 messages
+    maxAgeHours: 24,    // Clear after 24 hours
+  });
+  if (shouldClear) {
+    await sessions.clear(agentId, 'slack', 'U12345');
+  }
+}
+```
+
+## 9. UserRegistry
+
+Cross-channel user identity management. Users can have multiple identities across different channels (Slack, Discord, etc.) that all resolve to the same user record.
+
+### Register a User
+
+```typescript
+import { UserRegistry } from 'botinabox';
+
+const users = new UserRegistry(db, hooks);
+
+const user = await users.register({
+  name: 'Jane Smith',
+  email: 'jane@example.com',
+  role: 'admin',
+  timezone: 'America/New_York',
+});
+// Emits: 'user.created' { user }
+// Returns: User { id, name, email, role, timezone, ... }
+```
+
+### Lookup
+
+```typescript
+// By ID
+const user = await users.getById(userId);
+
+// By email
+const user = await users.getByEmail('jane@example.com');
+
+// List with filters
+const admins = await users.list({ role: 'admin' });
+const orgUsers = await users.list({ org_id: 'org-uuid' });
+```
+
+### Resolve or Create (Cross-Channel Identity)
+
+The most common pattern: given a channel-specific external ID, find the existing user or create a new one.
+
+```typescript
+// First call: creates user + identity
+const user = await users.resolveOrCreate('U12345', 'slack', {
+  name: 'Jane Smith',
+  email: 'jane@example.com',
+});
+
+// Second call with same externalId + channel: returns existing user
+const sameUser = await users.resolveOrCreate('U12345', 'slack');
+// sameUser.id === user.id
+```
+
+### Add Identity (Link Accounts)
+
+Link additional channel identities to an existing user:
+
+```typescript
+// User has a Slack identity, now add Discord
+await users.addIdentity(user.id, 'discord', '987654321', 'Jane#1234');
+
+// Now resolving by Discord ID returns the same user
+const resolved = await users.resolveByIdentity('discord', '987654321');
+// resolved.id === user.id
+```
+
+### Update
+
+```typescript
+await users.update(user.id, {
+  role: 'superadmin',
+  timezone: 'Europe/London',
+});
+```
+
+### User Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | UUID |
+| `org_id` | `string?` | Organization ID |
+| `name` | `string` | Display name |
+| `email` | `string?` | Email address (unique per non-deleted user) |
+| `role` | `string?` | Role label |
+| `title` | `string?` | Job title |
+| `external_id` | `string?` | Primary external identifier |
+| `channel` | `string?` | Primary channel |
+| `timezone` | `string?` | IANA timezone |
+| `preferences` | `string` | JSON preferences object |
+| `notes` | `string?` | Freeform notes |
+
+## 10. SecretStore
+
+Manages secrets with environment scoping, rotation, and audit trail.
+
+### Set a Secret
+
+```typescript
+import { SecretStore } from 'botinabox';
+
+const secrets = new SecretStore(db, hooks);
+
+const meta = await secrets.set({
+  name: 'GITHUB_TOKEN',
+  type: 'api_key',
+  environment: 'production',
+  value: 'ghp_xxxxxxxxxxxx',
+  description: 'GitHub personal access token',
+  rotation_schedule: '90d',
+  expires_at: '2026-07-01T00:00:00Z',
+});
+// Emits: 'secret.created' { name: 'GITHUB_TOKEN' }
+// Returns: SecretMeta (without value field)
+```
+
+### Get a Secret
+
+```typescript
+// Get the value (emits 'secret.accessed' for audit)
+const value = await secrets.get('GITHUB_TOKEN', 'production');
+// Returns the value string, or null if not found
+
+// Get metadata only (no value, no audit event)
+const meta = await secrets.getMeta('GITHUB_TOKEN', 'production');
+// Returns: SecretMeta { id, name, type, environment, description, ... }
+```
+
+### Rotate a Secret
+
+```typescript
+await secrets.rotate('GITHUB_TOKEN', 'ghp_new_value', 'production');
+// Updates the value and emits 'secret.rotated'
+```
+
+### Delete a Secret
+
+```typescript
+await secrets.delete('GITHUB_TOKEN', 'production');
+// Soft-deletes (sets deleted_at) and emits 'secret.deleted'
+```
+
+### List All Secrets
+
+```typescript
+const all = await secrets.list();
+// Returns SecretMeta[] (values are never included in list results)
+```
+
+### Environment Scoping
+
+Secrets are scoped by environment. You can have the same secret name in different environments:
+
+```typescript
+await secrets.set({ name: 'API_KEY', environment: 'production', value: 'prod-key' });
+await secrets.set({ name: 'API_KEY', environment: 'staging', value: 'staging-key' });
+
+await secrets.get('API_KEY', 'production');  // 'prod-key'
+await secrets.get('API_KEY', 'staging');     // 'staging-key'
+```
+
+### Audit Trail
+
+Every `get`, `rotate`, and `delete` operation emits a hook event for audit:
+
+| Event | Payload |
+|-------|---------|
+| `secret.created` | `{ name }` |
+| `secret.accessed` | `{ name, environment }` |
+| `secret.rotated` | `{ name, environment }` |
+| `secret.deleted` | `{ name, environment }` |
+
+## 11. Chain Guards
+
+Prevent infinite followup chains between agents.
+
+### MAX_CHAIN_DEPTH
+
+The default maximum chain depth is 5. This means a task can trigger at most 5 levels of followup tasks before the chain is halted.
+
+```typescript
+import { MAX_CHAIN_DEPTH, checkChainDepth, buildChainOrigin } from 'botinabox';
+
+// MAX_CHAIN_DEPTH = 5
+
+// Check depth (throws if exceeded)
+checkChainDepth(3, MAX_CHAIN_DEPTH);  // OK
+checkChainDepth(6, MAX_CHAIN_DEPTH);  // Error: Chain depth limit exceeded (max 5)
+
+// Custom max
+checkChainDepth(3, 10);  // OK with higher limit
+```
+
+### buildChainOrigin
+
+Build chain metadata for child tasks. Tracks the original root task and increments depth.
+
+```typescript
+// No parent (root task)
+const root = buildChainOrigin();
+// { chain_depth: 0 }
+
+// Child of a root task
+const child = buildChainOrigin('task-123');
+// { chain_origin_id: 'task-123', chain_depth: 1 }
+
+// Grandchild (preserves original chain origin)
+const grandchild = buildChainOrigin('task-456', 'task-123', 1);
+// { chain_origin_id: 'task-123', chain_depth: 2 }
+```
+
+## Task Lifecycle: End-to-End
+
+Here is the complete lifecycle of a task from creation to completion:
+
+```
+1. TaskQueue.create()
+   ├── Status: 'todo'
+   ├── Validates chain depth
+   ├── Inserts into tasks table
+   └── Emits 'task.created'
+
+2. TaskQueue.poll() (or manual wakeup)
+   ├── Finds 'todo' tasks with assignee_id and no active run
+   └── Emits 'agent.wakeup' for each
+
+3. RunManager.startRun()
+   ├── Acquires agent lock (one run per agent)
+   ├── Inserts run record with status='running'
+   └── Returns runId
+
+4. Execution (ApiExecutionAdapter or CliExecutionAdapter)
+   ├── API: sends prompt to LLM, runs tool loop
+   └── CLI: spawns subprocess, captures output
+
+5. RunManager.finishRun()
+   ├── Updates run record (status, cost, tokens)
+   ├── Releases agent lock
+   │
+   ├── On SUCCESS (exitCode 0):
+   │   ├── Task status → 'done'
+   │   ├── Task result = run output
+   │   ├── If followup_agent_id set:
+   │   │   ├── chain_depth + 1 (checked against MAX_CHAIN_DEPTH)
+   │   │   ├── Create followup task for next agent
+   │   │   └── Emit 'task.followup.created'
+   │   └── Emit 'run.completed' { status: 'succeeded' }
+   │
+   └── On FAILURE (exitCode != 0):
+       ├── If retry_count < max_retries:
+       │   ├── Compute backoff: 5s * 2^retryCount (capped at maxBackoffMs)
+       │   ├── Task status → 'todo', retry_count++, next_retry_at set
+       │   └── Task will be picked up again on next poll after backoff
+       ├── If retries exhausted:
+       │   └── Task status → 'failed'
+       └── Emit 'run.completed' { status: 'failed' }
+```
+
+## Dependency Resolution Utilities
+
+Standalone functions for working with step/task dependency graphs:
+
+```typescript
+import { detectCycle, topologicalSort, areDependenciesMet } from 'botinabox';
 
 const steps = [
   { id: 'a', dependsOn: [] },
   { id: 'b', dependsOn: ['a'] },
-  { id: 'c', dependsOn: ['b'] },
+  { id: 'c', dependsOn: ['a', 'b'] },
 ];
 
-// Check for cycles
-const hasCycle = detectCycle(steps); // false
+// Check for cycles (DFS-based)
+detectCycle(steps);  // false
 
-// Get execution order
-const order = topologicalSort(steps); // ['a', 'b', 'c']
-```
+// Get execution order (topological sort)
+topologicalSort(steps);  // ['a', 'b', 'c']
 
-## Chain Guard
-
-Prevents infinite followup chains:
-
-```typescript
-import { checkChainDepth, buildChainOrigin } from '@botinabox/core';
-
-// Throws if depth > max (default 5)
-checkChainDepth(currentDepth, maxDepth);
-
-// Build chain metadata for child tasks
-const chain = buildChainOrigin(parentTaskId, parentOriginId, parentDepth);
-// → { chain_origin_id: 'root-task-id', chain_depth: 3 }
+// Check if all dependencies are satisfied
+const completed = new Set(['a', 'b']);
+areDependenciesMet('["a","b"]', completed);  // true
+areDependenciesMet('["a","c"]', completed);  // false
 ```

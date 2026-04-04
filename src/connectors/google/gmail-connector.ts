@@ -407,12 +407,19 @@ function parseAddressList(raw: string): EmailAddress[] {
   if (!raw.trim()) return [];
 
   const results: EmailAddress[] = [];
-  // Split on commas that are not inside angle brackets
-  const parts = raw.split(/,(?=(?:[^<]*<[^>]*>)*[^>]*$)/);
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (trimmed) results.push(parseAddress(trimmed));
+  let current = '';
+  let depth = 0;
+  for (const ch of raw) {
+    if (ch === '<') depth++;
+    else if (ch === '>') depth--;
+    else if (ch === ',' && depth === 0) {
+      if (current.trim()) results.push(parseAddress(current.trim()));
+      current = '';
+      continue;
+    }
+    current += ch;
   }
+  if (current.trim()) results.push(parseAddress(current.trim()));
   return results;
 }
 

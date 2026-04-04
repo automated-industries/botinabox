@@ -1,742 +1,474 @@
 # API Reference
 
-Complete API documentation for all public modules.
+Complete reference for all public exports from the `botinabox` package.
 
-## `@botinabox/shared`
+## Import Paths
 
-Zero-dependency package with types, interfaces, and constants.
+| Path | Contents |
+|------|----------|
+| `botinabox` | Core framework — all classes, types, constants, utilities |
+| `botinabox/anthropic` | Anthropic Claude provider |
+| `botinabox/openai` | OpenAI GPT provider |
+| `botinabox/ollama` | Ollama local model provider |
+| `botinabox/slack` | Slack channel adapter |
+| `botinabox/discord` | Discord channel adapter |
+| `botinabox/webhook` | Webhook channel adapter |
+| `botinabox/google` | Google Gmail + Calendar connectors |
 
-### Constants
+---
 
-#### `EVENTS`
+## Core Classes
+
+### HookBus
+
+Event bus for decoupled communication between layers. Handlers run in priority order (lower number = runs first).
 
 ```typescript
-import { EVENTS } from '@botinabox/shared';
-
-EVENTS.COST_RECORDED          // "cost.recorded"
-EVENTS.AGENT_CREATED          // "agent.created"
-EVENTS.AGENT_STATUS_CHANGED   // "agent.status_changed"
-EVENTS.BUDGET_EXCEEDED         // "budget.exceeded"
-EVENTS.TASK_CREATED            // "task.created"
-EVENTS.TASK_COMPLETED          // "task.completed"
-EVENTS.TASK_FAILED             // "task.failed"
-EVENTS.TASK_CANCELLED          // "task.cancelled"
-EVENTS.RUN_STARTED             // "run.started"
-EVENTS.RUN_COMPLETED           // "run.completed"
-EVENTS.RUN_FAILED              // "run.failed"
-EVENTS.MESSAGE_INBOUND         // "message.inbound"
-EVENTS.MESSAGE_ROUTED          // "message.routed"
-EVENTS.MESSAGE_PROCESSED       // "message.processed"
-EVENTS.MESSAGE_OUTBOUND        // "message.outbound"
-EVENTS.MESSAGE_SENT            // "message.sent"
-EVENTS.UPDATE_AVAILABLE        // "update.available"
-EVENTS.UPDATE_STARTED          // "update.started"
-EVENTS.UPDATE_COMPLETED        // "update.completed"
-EVENTS.UPDATE_FAILED           // "update.failed"
-EVENTS.WORKFLOW_STARTED        // "workflow.started"
-EVENTS.WORKFLOW_STEP_COMPLETED // "workflow.step_completed"
-EVENTS.WORKFLOW_COMPLETED      // "workflow.completed"
-EVENTS.WORKFLOW_FAILED         // "workflow.failed"
+import { HookBus } from 'botinabox';
+const hooks = new HookBus();
 ```
 
-#### `DEFAULTS`
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `register(event, handler, opts?)` | `() => void` | Register handler; returns unsubscribe function |
+| `emit(event, context)` | `Promise<void>` | Emit event to all matching handlers (async) |
+| `emitSync(event, context)` | `void` | Emit event synchronously |
+| `hasListeners(event)` | `boolean` | Check if event has registered handlers |
+| `listRegistered()` | `string[]` | List all registered event names |
+| `clear(event?)` | `void` | Clear handlers for one or all events |
+
+**Options:** `{ priority?: number; once?: boolean; filter?: Record<string, unknown> }`
+
+---
+
+### DataStore
+
+SQLite persistence layer built on [LatticeSQL](https://www.npmjs.com/package/latticesql). Manages schema, migrations, queries, and entity context rendering.
 
 ```typescript
-import { DEFAULTS } from '@botinabox/shared';
-
-DEFAULTS.TASK_POLL_INTERVAL_MS       // 30,000
-DEFAULTS.NOTIFICATION_POLL_INTERVAL_MS // 5,000
-DEFAULTS.HEARTBEAT_INTERVAL_MS       // 300,000
-DEFAULTS.ORPHAN_REAP_INTERVAL_MS     // 300,000
-DEFAULTS.STALE_RUN_THRESHOLD_MS      // 1,800,000
-DEFAULTS.STALE_TASK_AGE_MS           // 7,200,000
-DEFAULTS.MAX_CHAIN_DEPTH             // 5
-DEFAULTS.MAX_NOTIFICATION_RETRIES    // 3
-DEFAULTS.UPDATE_CHECK_INTERVAL_MS    // 86,400,000
-DEFAULTS.RENDER_WATCH_INTERVAL_MS    // 30,000
-DEFAULTS.DATA_PATH                   // "./data/bot.db"
-DEFAULTS.RENDER_OUTPUT_DIR           // "./context"
-DEFAULTS.LOG_PATH_TEMPLATE           // "./data/runs/{runId}.ndjson"
-DEFAULTS.BUDGET_WARN_PERCENT         // 80
+import { DataStore, defineCoreTables, defineDomainTables } from 'botinabox';
+const db = new DataStore({ dbPath: './data/bot.db', outputDir: '.', wal: true, hooks });
+defineCoreTables(db);
+defineDomainTables(db, { clients: true, repositories: true });
+await db.init();
 ```
 
-#### Status Enums
+**Constructor options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `dbPath` | `string` | — | Path to SQLite database file |
+| `outputDir` | `string` | `'.'` | Root directory for entity context rendering |
+| `wal` | `boolean` | `false` | Enable WAL mode for concurrent reads |
+| `hooks` | `HookBus` | — | Optional hook bus for observability |
+
+**CRUD Methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `insert(table, row)` | `Promise<Row>` | Insert row; returns with generated ID |
+| `upsert(table, row)` | `Promise<Row>` | Insert or update existing |
+| `update(table, pk, changes)` | `Promise<Row>` | Update by primary key |
+| `delete(table, pk)` | `Promise<void>` | Soft-delete (sets `deleted_at`) |
+| `get(table, pk)` | `Promise<Row \| undefined>` | Get by primary key |
+| `query(table, opts?)` | `Promise<Row[]>` | Query with filters, ordering, pagination |
+| `count(table, opts?)` | `Promise<number>` | Count matching rows |
+| `link(table, row)` | `Promise<Row>` | Insert into junction table (idempotent) |
+
+**Schema Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `define(table, def)` | Register table definition (before `init()`) |
+| `defineEntityContext(table, def)` | Register entity context rendering |
+| `init()` | Initialize database, create tables |
+| `migrate(migrations)` | Run versioned migrations |
+| `render()` | Render all entity contexts to files |
+| `reconcile()` | Render + cleanup orphan directories |
+| `tableInfo(table)` | Get column metadata |
+
+---
+
+### AgentRegistry
+
+Manages agent lifecycle — registration, lookup, status transitions.
 
 ```typescript
-import { TASK_STATUSES, AGENT_STATUSES, RUN_STATUSES } from '@botinabox/shared';
-
-TASK_STATUSES   // "backlog" | "todo" | "in_progress" | "in_review" | "done" | "blocked" | "cancelled"
-AGENT_STATUSES  // "idle" | "running" | "paused" | "terminated" | "error"
-RUN_STATUSES    // "queued" | "running" | "succeeded" | "failed" | "cancelled"
+import { AgentRegistry } from 'botinabox';
+const agents = new AgentRegistry(db, hooks);
 ```
 
-### Types
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `register(def, opts?)` | `Promise<string>` | Register agent; returns ID. `opts.actorAgentId` for agent-created agents |
+| `getById(id)` | `Promise<Row \| undefined>` | Get agent by ID |
+| `getBySlug(slug)` | `Promise<Row \| undefined>` | Get agent by slug |
+| `list(filter?)` | `Promise<Row[]>` | List agents. Filter: `{ status?, role?, adapter? }` |
+| `update(id, changes)` | `Promise<void>` | Update agent fields |
+| `setStatus(id, status)` | `Promise<void>` | Validated status transition; emits `agent.status_changed` |
 
-#### Configuration
+**Agent statuses:** `idle` → `running` → `idle` | `paused` | `terminated` | `error`
+
+---
+
+### TaskQueue
+
+Priority-based task queue with polling, retry policies, and followup chains.
 
 ```typescript
-interface BotConfig {
-  data: DataConfig;
-  channels: Record<string, ChannelEntry>;
-  agents: AgentConfig[];
-  providers: Record<string, ProviderEntry>;
-  models: ModelConfig;
-  entities: Record<string, EntityConfig>;
-  security: SecurityConfig;
-  render: RenderConfig;
-  updates: UpdateConfig;
-  budget: BudgetConfig;
-  workflows?: Record<string, WorkflowConfigEntry>;
-}
-
-interface DataConfig {
-  path: string;
-  walMode: boolean;
-  backupDir?: string;
-}
-
-interface ModelConfig {
-  aliases: Record<string, string>;
-  default: string;
-  routing: Record<string, string>;
-  fallbackChain: string[];
-  costLimit?: { perRunCents?: number };
-}
-
-interface SecurityConfig {
-  fieldLengthLimits?: Record<string, number>;
-  allowedFilePrefixes?: string[];
-}
-
-interface RenderConfig {
-  outputDir: string;
-  watchIntervalMs: number;
-}
-
-interface UpdateConfig {
-  policy: "auto-all" | "auto-compatible" | "auto-patch" | "notify" | "manual";
-  checkIntervalMs: number;
-  maintenanceWindow?: {
-    utcHourStart: number;
-    utcHourEnd: number;
-    days?: Array<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun">;
-  };
-}
-
-interface BudgetConfig {
-  globalMonthlyCents?: number;
-  warnPercent: number;
-}
+import { TaskQueue } from 'botinabox';
+const tasks = new TaskQueue(db, hooks, { pollIntervalMs: 30_000 });
 ```
 
-#### Agent Types
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `create(def)` | `Promise<string>` | Create task; emits `task.created`; returns ID |
+| `update(id, changes)` | `Promise<void>` | Update task fields |
+| `get(id)` | `Promise<Row \| undefined>` | Get task by ID |
+| `list(filter?)` | `Promise<Row[]>` | List tasks. Filter: `{ status?, assignee_id? }` |
+| `startPolling()` | `void` | Start background polling for eligible tasks |
+| `stopPolling()` | `void` | Stop polling |
+
+**Task statuses:** `backlog` | `todo` | `in_progress` | `in_review` | `done` | `blocked` | `cancelled`
+
+**TaskDefinition fields:** `title`, `description?`, `assigneeId?`, `priority?` (lower = higher), `followupAgentId?`, `followupTemplate?`, `retryPolicy?`, `metadata?`
+
+---
+
+### RunManager
+
+Manages execution runs with agent locking, retries, and followup chains.
 
 ```typescript
-interface AgentConfig {
-  slug: string;
-  name: string;
-  role?: string;
-  adapter: string;
-  model?: string;
-  workdir?: string;
-  instructionsFile?: string;
-  maxConcurrentRuns?: number;
-  budgetMonthlyCents?: number;
-  canCreateAgents?: boolean;
-  skipPermissions?: boolean;
-  config?: Record<string, unknown>;
-}
-
-interface AgentRecord extends AgentConfig {
-  id: string;
-  status: "idle" | "running" | "paused" | "terminated" | "error";
-  spentMonthlyCents: number;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string;
-}
-
-interface BudgetCheck {
-  allowed: boolean;
-  status: "ok" | "warning" | "hard_stop";
-  spentCents: number;
-  limitCents?: number;
-  message?: string;
-}
+import { RunManager } from 'botinabox';
+const runs = new RunManager(db, hooks);
 ```
 
-#### LLM Types
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `isLocked(agentId)` | `boolean` | Check if agent has an active run |
+| `startRun(agentId, taskId, adapter?)` | `Promise<string>` | Create run, acquire lock; returns run ID |
+| `finishRun(runId, result)` | `Promise<void>` | Complete run — handles success, failure, retry, followup |
+| `getStaleRuns(thresholdMs?)` | `Promise<Row[]>` | Find runs exceeding threshold |
+| `reapOrphanRuns(thresholdMs?)` | `Promise<number>` | Fail orphaned runs; returns count |
+
+**finishRun result:** `{ exitCode: number; output?: string; costCents?: number; usage?: { inputTokens, outputTokens } }`
+
+On success (`exitCode: 0`): marks task `done`, creates followup task if `followupAgentId` set.
+On failure with retries remaining: schedules retry with exponential backoff.
+
+---
+
+### WorkflowEngine
+
+Multi-step workflows with dependency resolution and parallel execution.
 
 ```typescript
-interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string | ContentBlock[];
-}
-
-type ContentBlock =
-  | { type: "text"; text: string }
-  | { type: "tool_use"; id: string; name: string; input: unknown }
-  | { type: "tool_result"; tool_use_id: string; content: string };
-
-interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;  // JSON Schema
-}
-
-interface ChatParams {
-  messages: ChatMessage[];
-  system?: string;
-  tools?: ToolDefinition[];
-  maxTokens?: number;
-  temperature?: number;
-  model: string;
-  abortSignal?: AbortSignal;
-}
-
-interface TokenUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens?: number;
-  cacheWriteTokens?: number;
-}
-
-interface ChatResult {
-  content: string;
-  toolUses?: ToolUse[];
-  usage: TokenUsage;
-  model: string;
-  stopReason: "end_turn" | "tool_use" | "max_tokens" | "stop_sequence";
-}
-
-interface ModelInfo {
-  id: string;
-  displayName: string;
-  contextWindow: number;
-  maxOutputTokens: number;
-  capabilities: Array<"chat" | "tools" | "vision" | "streaming">;
-  inputCostPerMToken?: number;
-  outputCostPerMToken?: number;
-}
-
-interface LLMProvider {
-  id: string;
-  displayName: string;
-  models: ModelInfo[];
-  chat(params: ChatParams): Promise<ChatResult>;
-  chatStream(params: ChatParams): AsyncGenerator<string, ChatResult>;
-  serializeTools(tools: ToolDefinition[]): unknown;
-}
+import { WorkflowEngine } from 'botinabox';
+const workflows = new WorkflowEngine(db, hooks, tasks);
 ```
 
-#### Channel Types
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `define(slug, def)` | `Promise<void>` | Register workflow; validates deps and cycles |
+| `start(slug, context)` | `Promise<string>` | Start workflow run; returns run ID |
+| `onStepCompleted(taskId, output)` | `Promise<void>` | Advance workflow when a step completes |
+| `list()` | `Promise<Row[]>` | List all defined workflows |
+| `get(slug)` | `Promise<Row \| undefined>` | Get workflow by slug |
+
+Steps with no `dependsOn` run in parallel. Steps wait for all dependencies to complete before starting.
+
+---
+
+### Scheduler
+
+Database-backed job scheduling with cron expressions.
 
 ```typescript
-type ChatType = "direct" | "group" | "channel";
-type FormattingMode = "markdown" | "mrkdwn" | "html" | "plain";
-
-interface ChannelCapabilities {
-  chatTypes: ChatType[];
-  threads: boolean;
-  reactions: boolean;
-  editing: boolean;
-  media: boolean;
-  polls: boolean;
-  maxTextLength: number;
-  formattingMode: FormattingMode;
-}
-
-interface InboundMessage {
-  id: string;
-  channel: string;
-  account?: string;
-  from: string;
-  body: string;
-  threadId?: string;
-  replyToId?: string;
-  attachments?: Attachment[];
-  receivedAt: string;
-  raw?: unknown;
-}
-
-interface OutboundPayload {
-  text: string;
-  threadId?: string;
-  replyToId?: string;
-  attachments?: Attachment[];
-}
-
-interface SendResult {
-  success: boolean;
-  messageId?: string;
-  error?: string;
-}
-
-interface ChannelAdapter {
-  id: string;
-  meta: ChannelMeta;
-  capabilities: ChannelCapabilities;
-  connect(config: ChannelConfig): Promise<void>;
-  disconnect(): Promise<void>;
-  healthCheck(): Promise<HealthStatus>;
-  send(target: { peerId: string; threadId?: string }, payload: OutboundPayload): Promise<SendResult>;
-  onMessage?: (message: InboundMessage) => Promise<void>;
-}
+import { Scheduler } from 'botinabox';
+const scheduler = new Scheduler(db, hooks);
 ```
 
-#### Task Types
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `register(def)` | `Promise<string>` | Register schedule; returns ID |
+| `update(id, changes)` | `Promise<void>` | Update schedule |
+| `unregister(id)` | `Promise<void>` | Remove schedule |
+| `list(filter?)` | `Promise<Schedule[]>` | List schedules. Filter: `{ enabled? }` |
+| `start(pollIntervalMs?)` | `Promise<void>` | Start polling for due schedules |
+| `stop()` | `void` | Stop polling |
+| `tick()` | `Promise<void>` | Manually check and fire due schedules |
+
+**ScheduleDef:** `{ name, cron?, runAt?, action, actionConfig?, timezone?, description? }`
+
+When a schedule fires, the scheduler emits `hooks.emit(schedule.action, schedule.actionConfig)`.
+
+---
+
+### ChannelRegistry
+
+Manages channel adapter lifecycle.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `register(adapter, config?)` | `void` | Register adapter |
+| `unregister(id)` | `Promise<void>` | Disconnect and remove |
+| `start()` | `Promise<void>` | Connect all adapters |
+| `stop()` | `Promise<void>` | Disconnect all |
+| `healthCheck()` | `Promise<Record<string, HealthStatus>>` | Health check all |
+| `has(id)` / `get(id)` / `list()` | — | Lookup adapters |
+
+---
+
+### MessagePipeline
+
+Routes inbound messages to tasks.
 
 ```typescript
-type TaskStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "blocked" | "cancelled";
-
-interface RetryPolicy {
-  maxRetries: number;
-  backoffMs: number;
-  backoffMultiplier: number;
-  maxBackoffMs: number;
-}
-
-interface TaskDefinition {
-  title: string;
-  description?: string;
-  assigneeId?: string;
-  priority?: number;
-  parentId?: string;
-  dependsOn?: string[];
-  followupAgentId?: string;
-  followupTemplate?: string;
-  chainOriginId?: string;
-  chainDepth?: number;
-  retryPolicy?: RetryPolicy;
-  metadata?: Record<string, unknown>;
-}
-
-interface TaskRecord extends TaskDefinition {
-  id: string;
-  status: TaskStatus;
-  priority: number;
-  chainDepth: number;
-  retryCount: number;
-  maxRetries: number;
-  nextRetryAt?: string;
-  executionRunId?: string;
-  result?: string;
-  completedOutput?: string;
-  createdAt: string;
-  updatedAt: string;
-  completedAt?: string;
-  deletedAt?: string;
-}
+import { MessagePipeline } from 'botinabox';
+const pipeline = new MessagePipeline(hooks, agents, tasks, config, userRegistry);
+slackAdapter.onMessage = (msg) => pipeline.processInbound(msg);
 ```
 
-#### Execution Types
+**Flow:** `message.inbound` → resolve user → resolve agent → evaluate policy → create task → `message.processed`
+
+---
+
+### NotificationQueue
+
+Queues and delivers outbound messages with retry.
 
 ```typescript
-type RunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
-
-interface RunContext {
-  runId: string;
-  agentId: string;
-  agentSlug: string;
-  taskId?: string;
-  taskTitle?: string;
-  taskDescription?: string;
-  model: string;
-  workdir: string;
-  sessionParams?: unknown;
-  abortSignal?: AbortSignal;
-  onLog?: (line: string) => void;
-}
-
-interface RunResult {
-  status: "succeeded" | "failed";
-  output?: string;
-  error?: string;
-  usage?: TokenUsage;
-  costCents?: number;
-  sessionParams?: unknown;
-  clearSession?: boolean;
-  durationMs: number;
-}
-
-interface ExecutionAdapter {
-  id: string;
-  execute(ctx: RunContext): Promise<RunResult>;
-}
-```
-
-#### Workflow Types
-
-```typescript
-type WorkflowRunStatus = "running" | "completed" | "failed" | "cancelled";
-
-interface WorkflowStep {
-  id: string;
-  name: string;
-  agentSlug?: string;
-  agentResolver?: string;
-  taskTemplate: { title: string; description: string };
-  dependsOn?: string[];
-  onComplete?: "next" | "parallel" | "end";
-  onFail?: "abort" | "skip" | "retry";
-  retryPolicy?: RetryPolicy;
-  condition?: string;
-}
-
-interface WorkflowDefinition {
-  slug: string;
-  name: string;
-  description?: string;
-  steps: WorkflowStep[];
-  trigger?: WorkflowTrigger;
-}
-
-interface WorkflowTrigger {
-  type: "task_completed" | "event" | "schedule" | "manual";
-  filter?: Record<string, unknown>;
-}
+import { NotificationQueue } from 'botinabox';
+const notifications = new NotificationQueue(db, hooks, channels);
+notifications.startWorker();
+await notifications.enqueue('slack', channelId, { text: 'Done!', threadId });
 ```
 
 ---
 
-## `@botinabox/core`
+### BudgetController
 
-### HookBus
+Per-agent and global cost tracking.
 
-```typescript
-import { HookBus } from '@botinabox/core';
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `checkBudget(agentId)` | `Promise<BudgetCheck>` | Check agent budget; emits warning at threshold |
+| `resetMonthlySpend(agentId)` | `Promise<void>` | Reset monthly spend counter |
+| `globalCheck()` | `Promise<{ allowed, totalSpentCents, limitCents }>` | Check global budget |
 
-class HookBus {
-  register(event: string, handler: HookHandler, opts?: HookOptions): Unsubscribe;
-  emit(event: string, context: Record<string, unknown>): Promise<void>;
-  emitSync(event: string, context: Record<string, unknown>): void;
-  hasListeners(event: string): boolean;
-  listRegistered(): string[];
-  clear(event?: string): void;
-}
+---
 
-type HookHandler = (context: Record<string, unknown>) => Promise<void> | void;
-type Unsubscribe = () => void;
+### UserRegistry
 
-interface HookOptions {
-  priority?: number;              // 0-100, default 50, lower runs first
-  once?: boolean;                 // Auto-remove after first call
-  filter?: Record<string, unknown>; // Only fire if context matches
-}
-```
+User management with cross-channel identity resolution.
 
-### Config
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `register(input)` | `Promise<User>` | Create user |
+| `getById(id)` / `getByEmail(email)` | `Promise<User \| null>` | Lookup |
+| `resolveByIdentity(channel, externalId)` | `Promise<User \| null>` | Find by channel identity |
+| `resolveOrCreate(externalId, channel, defaults?)` | `Promise<User>` | Find or create user |
+| `addIdentity(userId, channel, externalId)` | `Promise<void>` | Link additional identity |
+| `list(filter?)` | `Promise<User[]>` | List users |
 
-```typescript
-import { loadConfig, initConfig, getConfig, interpolateEnv } from '@botinabox/core';
+---
 
-function loadConfig(opts?: {
-  configPath?: string;
-  overrides?: Partial<BotConfig>;
-  env?: Record<string, string | undefined>;
-}): { config: BotConfig; errors: ConfigLoadError[] };
+### SecretStore
 
-function initConfig(opts?: Parameters<typeof loadConfig>[0]): ConfigLoadError[];
-function getConfig(): BotConfig;  // Frozen singleton
-function interpolateEnv(obj: unknown, env: Record<string, string | undefined>): unknown;
-```
+Encrypted credential storage.
 
-### DataStore
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `set(input)` | `Promise<SecretMeta>` | Store secret |
+| `get(name, environment?)` | `Promise<string \| null>` | Retrieve value |
+| `getMeta(name, environment?)` | `Promise<SecretMeta \| null>` | Get metadata only |
+| `list()` | `Promise<SecretMeta[]>` | List all metadata |
+| `rotate(name, newValue, environment?)` | `Promise<void>` | Update value |
+| `delete(name, environment?)` | `Promise<void>` | Remove secret |
+| `loadCursor(key)` | `Promise<string \| undefined>` | Load a sync cursor by key |
+| `saveCursor(key, value)` | `Promise<void>` | Persist a sync cursor |
 
-```typescript
-import { DataStore, defineCoreTables } from '@botinabox/core';
-
-class DataStore {
-  constructor(opts: { dbPath: string; outputDir?: string; wal?: boolean; hooks?: HookBus });
-
-  define(name: string, def: TableDefinition): void;
-  defineEntityContext(name: string, def: EntityContextDef): void;
-  init(): void;
-
-  insert(table: string, row: Row): Row;
-  upsert(table: string, row: Row): Row;
-  update(table: string, pk: string | Record<string, unknown>, changes: Row): Row;
-  delete(table: string, pk: string | Record<string, unknown>): void;
-  get(table: string, pk: string | Record<string, unknown>): Row | undefined;
-  query(table: string, opts?: QueryOptions): Row[];
-  count(table: string, opts?: QueryOptions): number;
-
-  link(junctionTable: string, row: Row): void;
-  unlink(junctionTable: string, row: Row): void;
-
-  seed(items: SeedItem[]): void;
-  render(manifest: RenderManifest): void;
-}
-
-function defineCoreTables(db: DataStore): void;
-
-interface TableDefinition {
-  columns: Record<string, string>;
-  primaryKey?: string | string[];
-  tableConstraints?: string[];
-  relations?: Record<string, RelationDef>;
-  render?: string | ((rows: Row[]) => string);
-  outputFile?: string;
-  filter?: (rows: Row[]) => Row[];
-}
-
-interface QueryOptions {
-  where?: Record<string, unknown>;
-  filters?: Filter[];
-  orderBy?: string | Array<{ col: string; dir: 'asc' | 'desc' }>;
-  orderDir?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
-}
-```
-
-### ProviderRegistry & ModelRouter
-
-```typescript
-import { ProviderRegistry, ModelRouter, discoverProviders, setupCostTracker } from '@botinabox/core';
-
-class ProviderRegistry {
-  register(provider: LLMProvider): void;
-  unregister(id: string): void;
-  get(id: string): LLMProvider | undefined;
-  list(): LLMProvider[];
-  listModels(): ModelInfo[];
-}
-
-class ModelRouter {
-  constructor(registry: ProviderRegistry, config: ModelConfig);
-  resolve(modelIdOrAlias: string): ResolvedModel | undefined;
-  resolveWithFallback(modelIdOrAlias: string): ResolvedModel;
-  resolveForPurpose(purpose: string): ResolvedModel;
-  listAvailable(): ModelInfo[];
-}
-
-interface ResolvedModel {
-  provider: string;
-  model: string;
-}
-
-function discoverProviders(nodeModulesPath: string, importer?: Function): Promise<LLMProvider[]>;
-function setupCostTracker(hooks: HookBus, db: DataStore, opts?: { modelCatalog?: ModelInfo[] }): void;
-```
-
-### Chat
-
-```typescript
-import {
-  ChannelRegistry,
-  MessagePipeline,
-  ChatSessionManager,
-  SessionKey,
-  NotificationQueue,
-  discoverChannels,
-  buildAgentBindings,
-  checkAllowlist,
-  checkMentionGate,
-} from '@botinabox/core';
-
-class ChannelRegistry {
-  register(adapter: ChannelAdapter, config?: unknown): void;
-  unregister(id: string): Promise<void>;
-  reconfigure(id: string, config: unknown): Promise<void>;
-  get(id: string): ChannelAdapter | undefined;
-  healthCheck(): Promise<Record<string, HealthStatus>>;
-  start(): Promise<void>;
-  stop(): Promise<void>;
-}
-
-class MessagePipeline {
-  constructor(hooks: HookBus, agentRegistry: AgentRegistry, taskQueue: TaskQueue, config: BotConfig);
-  processInbound(msg: InboundMessage): Promise<void>;
-  resolveAgent(msg: InboundMessage): string | undefined;
-  evaluatePolicy(msg: InboundMessage, agentId: string): boolean;
-}
-
-class ChatSessionManager {
-  save(agentId: string, channelId: string, peerId: string, params: Record<string, unknown>): Promise<string>;
-  load(agentId: string, channelId: string, peerId: string): Promise<Record<string, unknown> | undefined>;
-  clear(agentId: string, channelId: string, peerId: string): Promise<void>;
-  shouldClear(session: Record<string, unknown>, opts: { maxRuns?: number; maxAgeHours?: number }): Promise<boolean>;
-}
-
-class SessionKey {
-  constructor(agentId: string, channel: string, scope: string);
-  toString(): string;
-  toJSON(): { agentId: string; channel: string; scope: string };
-  static fromString(key: string): SessionKey;
-  static build(agentId: string, channel: string, chatType: string, peerId: string, dmScope: string): SessionKey;
-}
-
-class NotificationQueue {
-  constructor(db: DataStore, hooks: HookBus, channelRegistry: ChannelRegistry, opts?: NotificationQueueOpts);
-  enqueue(channel: string, recipient: string, payload: OutboundPayload): Promise<string>;
-  startWorker(): void;
-  stopWorker(): void;
-}
-
-function discoverChannels(nodeModulesPath: string, importer?: Function): Promise<ChannelAdapter[]>;
-function buildAgentBindings(agents: AgentConfig[]): Map<string, string>;
-function checkAllowlist(allowFrom: string[], senderId: string): boolean;
-function checkMentionGate(msg: InboundMessage, botId: string): boolean;
-```
-
-### Orchestrator
-
-```typescript
-import {
-  AgentRegistry,
-  TaskQueue,
-  RunManager,
-  WorkflowEngine,
-  BudgetController,
-  WakeupQueue,
-  HeartbeatScheduler,
-  NdjsonLogger,
-  checkChainDepth,
-  buildChainOrigin,
-  detectCycle,
-  topologicalSort,
-  toolLoop,
-} from '@botinabox/core';
-
-class AgentRegistry {
-  constructor(db: DataStore, hooks: HookBus);
-  register(agent: object, opts?: { actorAgentId?: string }): Promise<string>;
-  getById(id: string): Promise<Record<string, unknown> | undefined>;
-  getBySlug(slug: string): Promise<Record<string, unknown> | undefined>;
-  list(filter?: { status?: string; role?: string }): Promise<Record<string, unknown>[]>;
-  update(id: string, changes: Record<string, unknown>): Promise<void>;
-}
-
-class TaskQueue {
-  constructor(db: DataStore, hooks: HookBus, config?: { pollIntervalMs?: number; staleThresholdMs?: number });
-  create(task: object): Promise<string>;
-  update(id: string, changes: Record<string, unknown>): Promise<void>;
-  get(id: string): Promise<Record<string, unknown> | undefined>;
-  list(filter?: { status?: string; assignee_id?: string }): Promise<Record<string, unknown>[]>;
-  startPolling(): void;
-  stopPolling(): void;
-}
-
-class RunManager {
-  constructor(db: DataStore, hooks: HookBus, config?: { staleThresholdMs?: number; maxBackoffMs?: number });
-  isLocked(agentId: string): boolean;
-  startRun(agentId: string, taskId: string, adapter?: string): Promise<string>;
-  finishRun(runId: string, result: object): Promise<void>;
-}
-
-class WorkflowEngine {
-  constructor(db: DataStore, hooks: HookBus, taskQueue: TaskQueue);
-  define(slug: string, def: WorkflowDefinition): Promise<void>;
-  start(workflowSlug: string, context: Record<string, unknown>): Promise<string>;
-  advance(workflowRunId: string): Promise<void>;
-}
-
-class BudgetController {
-  constructor(db: DataStore, hooks: HookBus);
-  checkBudget(agentId: string): Promise<BudgetCheck>;
-  resetMonthlySpend(agentId: string): Promise<void>;
-  globalCheck(): Promise<object>;
-}
-
-class WakeupQueue {
-  enqueue(agentId: string, source: string, context?: Record<string, unknown>): Promise<string>;
-  coalesce(agentId: string, context?: Record<string, unknown>): Promise<void>;
-  getNext(agentId: string): Promise<Record<string, unknown> | undefined>;
-  markFired(wakeupId: string, runId: string): Promise<void>;
-}
-
-class HeartbeatScheduler {
-  constructor(wakeupQueue: WakeupQueue, hooks: HookBus);
-  start(agents: Array<{ id: string; heartbeat_config: string }>): void;
-  stop(): void;
-}
-
-class NdjsonLogger {
-  constructor(logPath: string);
-  log(stream: 'stdout' | 'stderr', chunk: string): void;
-  close(): void;
-}
-
-function checkChainDepth(depth: number, max?: number): void;
-function buildChainOrigin(parentTaskId?: string, parentOriginId?: string, parentDepth?: number): object;
-function detectCycle(steps: Array<{ id: string; dependsOn?: string[] }>): boolean;
-function topologicalSort(steps: Array<{ id: string; dependsOn?: string[] }>): string[];
-
-function toolLoop(
-  params: { model: string; messages: ChatMessage[]; systemPrompt?: string; tools?: ToolDefinition[]; maxIterations?: number; signal?: AbortSignal },
-  callLLM: (params: ChatParams) => Promise<ChatResult>,
-  executeTool?: (name: string, input: unknown) => Promise<string>
-): AsyncGenerator<{ type: 'text'; content: string } | { type: 'tool_use'; name: string; input: unknown } | { type: 'done'; result: ChatResult }>;
-```
-
-### UserRegistry (v0.2.0+)
-
-```typescript
-import { UserRegistry } from 'botinabox';
-
-class UserRegistry {
-  constructor(db: DataStore, hooks: HookBus);
-  register(input: UserInput): Promise<User>;
-  getById(id: string): Promise<User | null>;
-  getByEmail(email: string): Promise<User | null>;
-  resolveByIdentity(channel: string, externalId: string): Promise<User | null>;
-  resolveOrCreate(externalId: string, channel: string, defaults?: Partial<UserInput>): Promise<User>;
-  list(filter?: { role?: string; org_id?: string }): Promise<User[]>;
-  update(id: string, changes: Partial<UserInput>): Promise<void>;
-  addIdentity(userId: string, channel: string, externalId: string, displayName?: string): Promise<void>;
-}
-```
-
-Users are **protected objects** — their context is never auto-rendered into other entities' files. Use `resolveOrCreate()` in the message pipeline to auto-create users from channel peer IDs.
-
-### SecretStore (v0.2.0+)
+**Cursor methods** are convenience wrappers for storing incremental sync state (e.g. Gmail `historyId`, Calendar `syncToken`):
 
 ```typescript
 import { SecretStore } from 'botinabox';
+const secrets = new SecretStore(db);
 
-class SecretStore {
-  constructor(db: DataStore, hooks: HookBus);
-  set(input: SecretInput): Promise<SecretMeta>;
-  get(name: string, environment?: string): Promise<string | null>;  // decrypted value
-  getMeta(name: string, environment?: string): Promise<SecretMeta | null>;
-  list(): Promise<SecretMeta[]>;  // metadata only, no values
-  rotate(name: string, newValue: string, environment?: string): Promise<void>;
-  delete(name: string, environment?: string): Promise<void>;
-}
+// Save a sync cursor after pulling new records
+await secrets.saveCursor('gmail:user@example.com', result.cursor!);
+
+// Load it on the next sync
+const cursor = await secrets.loadCursor('gmail:user@example.com');
+const result = await gmail.sync({ cursor });
 ```
 
-Secrets are **protected objects** with optional at-rest encryption. When Lattice's `encryptionKey` is configured, secret values are transparently encrypted on write and decrypted on read. Use `get()` for the decrypted value, `getMeta()` for metadata only.
+---
 
-### Security
+## Schema Functions
+
+### defineCoreTables(db)
+
+Creates 18 core tables: `agents`, `tasks`, `runs`, `sessions`, `messages`, `wakeups`, `notifications`, `skills`, `agent_skills`, `cost_events`, `budget_policies`, `activity_log`, `config_revisions`, `workflows`, `workflow_runs`, `users`, `user_identities`, `secrets`, `schedules`, `update_history`
+
+### defineDomainTables(db, options?)
+
+Creates optional domain tables: `org`, `project`, `agent_project`, `client`, `invoice`, `repository`, `file`, `channel`, `rule`, `rule_agent`, `rule_project`, `event`
+
+Options: `{ clients?: boolean; repositories?: boolean; files?: boolean; channels?: boolean; rules?: boolean }`
+
+### defineCoreEntityContexts(db)
+
+Registers entity context rendering for core tables (agents, users, skills, messages).
+
+### defineDomainEntityContexts(db, options?)
+
+Registers entity context rendering for domain tables (org, project, client, file, channel, rule, event).
+
+---
+
+## Entity Context Source Types
+
+| Type | Description | Key Fields |
+|------|-------------|------------|
+| `self` | The entity's own row | — |
+| `hasMany` | Rows in another table with FK to this entity | `table`, `foreignKey`, `orderBy?`, `limit?` |
+| `manyToMany` | Rows via junction table | `junctionTable`, `localKey`, `remoteKey`, `remoteTable` |
+| `belongsTo` | Single parent row via FK on this entity | `table`, `foreignKey` |
+| `custom` | Custom query function | `query: (row, adapter) => Row[]` |
+| `enriched` | Self row with embedded lookups | `include: Record<string, Source>` |
+
+---
+
+## Providers
+
+### AnthropicProvider
 
 ```typescript
-import { sanitize } from '@botinabox/core';
-
-function sanitize(
-  row: Record<string, unknown>,
-  opts?: {
-    fieldLengthLimits?: Record<string, number>;
-    truncateSuffix?: string;
-  }
-): Record<string, unknown>;
+import { AnthropicProvider } from 'botinabox/anthropic';
+const provider = new AnthropicProvider({ apiKey: '...' });
 ```
 
-### Update
+### OpenAIProvider
 
 ```typescript
-import { UpdateManager, UpdateChecker, BackupManager } from '@botinabox/core';
-
-class UpdateManager {
-  constructor(checker: UpdateChecker, db: DataStore, hooks: HookBus, opts?: object);
-  checkAndNotify(): Promise<UpdateManifest>;
-  applyUpdates(updates: PackageUpdate[]): Promise<void>;
-  isInMaintenanceWindow(): boolean;
-}
-
-class BackupManager {
-  backup(): Promise<string>;
-  restore(backupPath: string): Promise<void>;
-  cleanup(backupPath: string): Promise<void>;
-}
+import { OpenAIProvider } from 'botinabox/openai';
+const provider = new OpenAIProvider({ apiKey: '...' });
 ```
+
+### OllamaProvider
+
+```typescript
+import { OllamaProvider } from 'botinabox/ollama';
+const provider = new OllamaProvider({ baseUrl: 'http://localhost:11434' });
+```
+
+All providers implement `LLMProvider`: `chat(params)`, `chatStream(params)`, `serializeTools(tools)`.
+
+---
+
+## Channel Adapters
+
+All adapters implement `ChannelAdapter`: `connect()`, `disconnect()`, `healthCheck()`, `send(target, payload)`, `onMessage`.
+
+| Adapter | Import | Setup |
+|---------|--------|-------|
+| Slack | `botinabox/slack` | `new SlackAdapter({ botToken })` |
+| Discord | `botinabox/discord` | `new DiscordAdapter({ botToken })` |
+| Webhook | `botinabox/webhook` | `new WebhookAdapter()` + `new WebhookServer({ port, secret })` |
+
+### Voice Transcription (`botinabox/slack`)
+
+| Export | Description |
+|--------|-------------|
+| `transcribeAudio(buffer, filename, opts?)` | Transcribe audio buffer via whisper-node. Returns `string \| null`. |
+| `downloadAudio(url, token)` | Download audio from Slack `url_private`. Returns `Buffer \| null`. |
+| `enrichVoiceMessage(msg, botToken)` | Enrich a parsed message with local transcription. Returns `InboundMessage`. |
+| `extractVoiceTranscript(file)` | Extract Slack's built-in transcript from a file object. Returns `string \| null`. |
+
+Requires optional dependency `whisper-node` and `ffmpeg` on the system PATH. See [Voice Message Transcription](channels.md#voice-message-transcription).
+
+---
+
+## Google Connectors
+
+Both connectors implement `Connector<T>`: `connect(config)`, `sync(options?)`, `healthCheck()`.
+
+| Connector | Import | Record Type |
+|-----------|--------|-------------|
+| Gmail | `botinabox/google` | `EmailRecord` |
+| Calendar | `botinabox/google` | `CalendarEventRecord` |
+
+**Auth options:** OAuth2 (`oauth: { clientId, clientSecret, redirectUri }`) or service account (`serviceAccount: { keyFile, subject? }`).
+
+---
+
+## Utilities
+
+| Export | Description |
+|--------|-------------|
+| `autoUpdate(packages?, opts?)` | Check npm for newer versions and install at startup |
+| `truncateAtWord(text, maxLen)` | Truncate text at the nearest word boundary |
+| `parseClaudeStream(stdout)` | Parse Claude CLI NDJSON output |
+| `buildProcessEnv(allowedKeys?, inject?)` | Clean subprocess env (strips secrets) |
+| `interpolate(template, context)` | `{{key}}` template interpolation |
+| `formatText(text, mode)` | Convert markdown to channel format |
+| `chunkText(text, maxSize)` | Split text at newline boundaries |
+| `sanitize(row, opts?)` | Strip control characters, enforce length limits |
+| `detectCycle(steps)` | DFS cycle detection for workflow steps |
+| `topologicalSort(steps)` | Topological sort for dependency resolution |
+| `checkChainDepth(depth)` | Throws if depth > `MAX_CHAIN_DEPTH` (5) |
+
+### autoUpdate(packages?, opts?)
+
+Checks npm for newer versions of the specified packages and installs them. Designed to run at startup so your bot always uses the latest framework release.
+
+```typescript
+import { autoUpdate } from 'botinabox';
+
+// Update botinabox itself (default)
+await autoUpdate();
+
+// Update specific packages
+await autoUpdate(['botinabox', 'latticesql']);
+
+// With options
+await autoUpdate(['botinabox'], { silent: true });
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `packages` | `string[]` | `['botinabox']` | Package names to check and update |
+| `opts.silent` | `boolean` | `false` | Suppress console output |
+
+Returns `Promise<void>`.
+
+### truncateAtWord(text, maxLen)
+
+Truncates text to `maxLen` characters, cutting at the nearest word boundary so words are never split mid-way. Appends an ellipsis if the text was truncated.
+
+```typescript
+import { truncateAtWord } from 'botinabox';
+
+truncateAtWord('Hello world, this is a long sentence.', 20);
+// => 'Hello world, this...'
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `text` | `string` | The input text to truncate |
+| `maxLen` | `number` | Maximum character length of the result |
+
+Returns `string`.
+
+---
+
+## Constants
+
+```typescript
+import { EVENTS, DEFAULTS, TASK_STATUSES, AGENT_STATUSES, RUN_STATUSES } from 'botinabox';
+```
+
+**EVENTS:** `TASK_CREATED`, `TASK_COMPLETED`, `TASK_FAILED`, `RUN_STARTED`, `RUN_COMPLETED`, `RUN_FAILED`, `MESSAGE_INBOUND`, `MESSAGE_ROUTED`, `MESSAGE_PROCESSED`, `MESSAGE_OUTBOUND`, `AGENT_CREATED`, `AGENT_STATUS_CHANGED`, `BUDGET_EXCEEDED`, `COST_RECORDED`, `WORKFLOW_STARTED`, `WORKFLOW_COMPLETED`, `UPDATE_AVAILABLE`
+
+**DEFAULTS:** `TASK_POLL_INTERVAL_MS` (30s), `NOTIFICATION_POLL_INTERVAL_MS` (5s), `HEARTBEAT_INTERVAL_MS` (5m), `STALE_RUN_THRESHOLD_MS` (30m), `MAX_CHAIN_DEPTH` (5), `MAX_NOTIFICATION_RETRIES` (3)

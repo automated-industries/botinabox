@@ -92,7 +92,11 @@ export class SlackAdapter implements ChannelAdapter {
   async receive(event: Record<string, unknown>): Promise<void> {
     if (this.onMessage) {
       const { parseSlackEvent } = await import("./inbound.js");
-      const msg = parseSlackEvent(event as Parameters<typeof parseSlackEvent>[0]);
+      const { enrichVoiceMessage } = await import("./inbound.js");
+      let msg = parseSlackEvent(event as Parameters<typeof parseSlackEvent>[0]);
+      if (msg.body.includes("[Voice message") && this.config?.botToken) {
+        msg = await enrichVoiceMessage(msg, this.config.botToken);
+      }
       await this.onMessage(msg);
     }
   }

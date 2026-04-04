@@ -17,6 +17,8 @@ export interface DomainSchemaOptions {
   rules?: boolean;
   /** Include event audit log (default: true) */
   events?: boolean;
+  /** Include cross-domain junction tables (default: true) */
+  junctions?: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export function defineDomainTables(
     channels: true,
     rules: true,
     events: true,
+    junctions: true,
     ...options,
   };
 
@@ -75,6 +78,8 @@ export function defineDomainTables(
       deploy_target: "TEXT",
       production_url: "TEXT",
       branch_strategy: "TEXT",
+      repo_path: "TEXT",
+      codename: "TEXT",
       notes: "TEXT",
       created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
@@ -124,6 +129,7 @@ export function defineDomainTables(
         contact_name: "TEXT",
         contact_email: "TEXT",
         phone: "TEXT",
+        address: "TEXT",
         status: "TEXT NOT NULL DEFAULT 'active'",
         notes: "TEXT",
         created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
@@ -209,6 +215,7 @@ export function defineDomainTables(
         project_id: "TEXT",
         access_level: "TEXT NOT NULL DEFAULT 'org'",
         description: "TEXT",
+        tags: "TEXT",
         notes: "TEXT",
         created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
         updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
@@ -248,6 +255,8 @@ export function defineDomainTables(
         scope: "TEXT NOT NULL DEFAULT 'org'",
         category: "TEXT NOT NULL DEFAULT 'process'",
         priority: "INTEGER NOT NULL DEFAULT 50",
+        rationale: "TEXT",
+        enforcement: "TEXT DEFAULT 'advisory'",
         created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
         updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
         deleted_at: "TEXT",
@@ -297,6 +306,7 @@ export function defineDomainTables(
         actor_user_id: "TEXT",
         project_id: "TEXT",
         channel_id: "TEXT",
+        source: "TEXT",
         created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
         deleted_at: "TEXT",
       },
@@ -304,6 +314,66 @@ export function defineDomainTables(
         "CREATE INDEX IF NOT EXISTS idx_event_type ON event(type, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_event_project ON event(project_id)",
       ],
+    });
+  }
+
+  // --- Optional: cross-domain junction tables ---
+
+  if (opts.junctions) {
+    db.define("secret_client", {
+      columns: {
+        secret_id: "TEXT NOT NULL",
+        client_id: "TEXT NOT NULL",
+        created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      },
+      primaryKey: ["secret_id", "client_id"],
+    });
+
+    db.define("secret_user", {
+      columns: {
+        secret_id: "TEXT NOT NULL",
+        user_id: "TEXT NOT NULL",
+        created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      },
+      primaryKey: ["secret_id", "user_id"],
+    });
+
+    db.define("secret_repository", {
+      columns: {
+        secret_id: "TEXT NOT NULL",
+        repository_id: "TEXT NOT NULL",
+        created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      },
+      primaryKey: ["secret_id", "repository_id"],
+    });
+
+    db.define("file_agent", {
+      columns: {
+        file_id: "TEXT NOT NULL",
+        agent_id: "TEXT NOT NULL",
+        created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      },
+      primaryKey: ["file_id", "agent_id"],
+    });
+
+    db.define("user_channel", {
+      columns: {
+        user_id: "TEXT NOT NULL",
+        channel_id: "TEXT NOT NULL",
+        role: "TEXT",
+        created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      },
+      primaryKey: ["user_id", "channel_id"],
+    });
+
+    db.define("user_project", {
+      columns: {
+        user_id: "TEXT NOT NULL",
+        project_id: "TEXT NOT NULL",
+        role: "TEXT",
+        created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      },
+      primaryKey: ["user_id", "project_id"],
     });
   }
 }
