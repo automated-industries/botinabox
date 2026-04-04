@@ -101,6 +101,14 @@ export class RunManager {
         }
       }
     } else {
+      // Mark task done with result before emitting run.completed,
+      // so hook handlers can read task.result immediately.
+      await this.db.update('tasks', { id: taskId }, {
+        status: 'done',
+        result: result.output,
+        updated_at: new Date().toISOString(),
+      });
+
       // Followup chain
       const task = await this.db.get('tasks', { id: taskId });
       if (task && task['followup_agent_id']) {

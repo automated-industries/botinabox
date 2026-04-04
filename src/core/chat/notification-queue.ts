@@ -37,6 +37,10 @@ export class NotificationQueue {
     recipient: string,
     payload: { text: string; threadId?: string; [key: string]: unknown },
   ): Promise<string> {
+    if (!this.channelRegistry.has(channel)) {
+      throw new Error(`No registered adapter for channel: ${channel}`);
+    }
+
     const row = await this.db.insert("notifications", {
       channel,
       recipient_id: recipient,

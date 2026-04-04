@@ -45,8 +45,13 @@ export class TaskQueue {
       ),
     });
 
-    await this.hooks.emit('task.created', { taskId: row['id'], title: task.title });
-    return row['id'] as string;
+    const taskId = row['id'] as string;
+
+    // Non-blocking: let callers do setup (e.g. insert related records) before
+    // hook handlers (like execution engines) run.
+    void this.hooks.emit('task.created', { taskId, title: task.title });
+
+    return taskId;
   }
 
   async update(id: string, changes: Record<string, unknown>): Promise<void> {

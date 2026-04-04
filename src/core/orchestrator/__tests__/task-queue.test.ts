@@ -29,12 +29,29 @@ describe('TaskQueue — Story 3.2', () => {
     expect(task!['status']).toBe('todo');
   });
 
-  it('create emits task.created hook', async () => {
+  it('create emits task.created hook (non-blocking)', async () => {
     const events: Record<string, unknown>[] = [];
     hooks.register('task.created', (ctx) => { events.push(ctx); });
     await queue.create({ title: 'Hook task' });
+    // Hook is emitted non-blocking — wait a tick for it to fire
+    await new Promise((r) => setTimeout(r, 10));
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ title: 'Hook task' });
+  });
+
+  it('create returns before task.created hook handlers complete', async () => {
+    // Regression: tasks.create() used to block on hook handlers, meaning
+    // long-running handlers (like execution engines) prevented callers from
+    // doing setup work (like inserting related records) after create().
+    let hookResolved = false;
+    hooks.register('task.created', async () => {
+      await new Promise((r) => setTimeout(r, 50));
+      hookResolved = true;
+    });
+    await queue.create({ title: 'Non-blocking' });
+    expect(hookResolved).toBe(false); // create() returned before hook finished
+    await new Promise((r) => setTimeout(r, 100));
+    expect(hookResolved).toBe(true); // hook eventually completes
   });
 
   it('create throws if chain_depth exceeds MAX_CHAIN_DEPTH', async () => {
