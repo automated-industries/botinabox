@@ -1,6 +1,6 @@
 {
   "name": "botinabox",
-  "version": "0.5.6",
+  "version": "1.0.0",
   "description": "Bot in a Box — framework for building multi-agent bots",
   "type": "module",
   "main": "./dist/index.js",
@@ -59,7 +59,7 @@
     "@types/uuid": "^10.0.0",
     "ajv": "^8.17.1",
     "cron-parser": "^4.9.0",
-    "latticesql": "^0.18.0",
+    "latticesql": "^1.0.0",
     "uuid": "^13.0.0",
     "yaml": "^2.7.0"
   },
