@@ -40,7 +40,7 @@ export interface EntityFileSpec {
 export type EntitySource =
   | { type: 'self' }
   | { type: 'hasMany'; table: string; foreignKey: string; filters?: Filter[]; softDelete?: boolean; orderBy?: string; limit?: number }
-  | { type: 'manyToMany'; junctionTable: string; localKey: string; remoteKey: string; remoteTable: string; filters?: Filter[]; orderBy?: string; limit?: number }
+  | { type: 'manyToMany'; junctionTable: string; localKey: string; remoteKey: string; remoteTable: string; filters?: Filter[]; softDelete?: boolean; orderBy?: string; limit?: number }
   | { type: 'belongsTo'; table: string; foreignKey: string }
   | { type: 'enriched'; include: Record<string, EntitySource> }
   | { type: 'custom'; resolve: (row: Row, adapter: SqliteAdapter) => Row[] };

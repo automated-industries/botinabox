@@ -78,6 +78,11 @@ export class ChannelRegistry {
     return results;
   }
 
+  /** Check if an adapter is registered. */
+  has(id: string): boolean {
+    return this.adapters.has(id);
+  }
+
   /** Get an adapter by ID. */
   get(id: string): ChannelAdapter | undefined {
     return this.adapters.get(id)?.adapter;

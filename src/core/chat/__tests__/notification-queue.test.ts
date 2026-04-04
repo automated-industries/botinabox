@@ -51,6 +51,7 @@ afterEach(() => {
 
 describe("NotificationQueue — Story 4.4", () => {
   it("enqueue inserts a notification with status=pending", async () => {
+    channelRegistry.register(makeSendAdapter("slack"));
     const queue = new NotificationQueue(db, hooks, channelRegistry);
     const id = await queue.enqueue("slack", "user-1", { text: "hello" });
 
@@ -63,6 +64,7 @@ describe("NotificationQueue — Story 4.4", () => {
   });
 
   it("enqueue emits notification.enqueued hook", async () => {
+    channelRegistry.register(makeSendAdapter("slack"));
     const queue = new NotificationQueue(db, hooks, channelRegistry);
     let emittedId: string | undefined;
     hooks.register("notification.enqueued", async (ctx) => {
@@ -71,6 +73,15 @@ describe("NotificationQueue — Story 4.4", () => {
 
     const id = await queue.enqueue("slack", "user-1", { text: "hello" });
     expect(emittedId).toBe(id);
+  });
+
+  it("enqueue rejects unknown channel at enqueue time", async () => {
+    // Regression: enqueue accepted any channel string and only failed at delivery
+    // time with "No adapter for channel: ...", making arg-swap bugs silent.
+    const queue = new NotificationQueue(db, hooks, channelRegistry);
+    await expect(
+      queue.enqueue("missing-channel", "user-1", { text: "hello" }),
+    ).rejects.toThrow("No registered adapter for channel: missing-channel");
   });
 
   it("worker sends pending notifications via adapter", async () => {
@@ -128,9 +139,15 @@ describe("NotificationQueue — Story 4.4", () => {
     expect(Number(rows[0]["retries"])).toBe(1);
   });
 
-  it("worker marks notification failed with no adapter for channel", async () => {
+  it("worker marks notification failed if adapter was unregistered after enqueue", async () => {
+    const adapter = makeSendAdapter("slack");
+    channelRegistry.register(adapter);
+
     const queue = new NotificationQueue(db, hooks, channelRegistry, { pollIntervalMs: 50 });
-    await queue.enqueue("missing-channel", "user-1", { text: "hello" });
+    await queue.enqueue("slack", "user-1", { text: "hello" });
+
+    // Adapter removed between enqueue and delivery
+    await channelRegistry.unregister("slack");
 
     const q = queue as unknown as { processNext(): Promise<void> };
     await q.processNext();

@@ -48,6 +48,35 @@ describe('RunManager — Story 3.3', () => {
     expect(manager.isLocked('agent-1')).toBe(false);
   });
 
+  it('finishRun sets task.result and task.status=done on success', async () => {
+    // Regression: finishRun did not update the task, so run.completed hook
+    // handlers could not read task.result — every consumer had to store it
+    // manually before calling finishRun.
+    await db.insert('tasks', { id: 'task-result', title: 'Test', status: 'todo' });
+    const runId = await manager.startRun('agent-1', 'task-result');
+    await manager.finishRun(runId, { exitCode: 0, output: 'The answer is 42' });
+
+    const task = await db.get('tasks', { id: 'task-result' });
+    expect(task!['status']).toBe('done');
+    expect(task!['result']).toBe('The answer is 42');
+  });
+
+  it('task.result is available when run.completed hook fires', async () => {
+    // Regression: task.result was written AFTER run.completed was emitted,
+    // so hook handlers read null.
+    await db.insert('tasks', { id: 'task-hook', title: 'Hook test', status: 'todo' });
+    let resultAtHookTime: unknown = undefined;
+    hooks.register('run.completed', async (ctx) => {
+      const task = await db.get('tasks', { id: ctx.taskId as string });
+      resultAtHookTime = task?.['result'];
+    });
+
+    const runId = await manager.startRun('agent-1', 'task-hook');
+    await manager.finishRun(runId, { exitCode: 0, output: 'Hook result' });
+
+    expect(resultAtHookTime).toBe('Hook result');
+  });
+
   it('finishRun marks run failed when exitCode!=0', async () => {
     const runId = await manager.startRun('agent-1', 'task-1');
     await manager.finishRun(runId, { exitCode: 1 });
