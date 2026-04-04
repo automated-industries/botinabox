@@ -6,6 +6,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [1.0.0] — 2026-04-04
+
+### Changed
+
+- **Stable release** — botinabox is now 1.0.0. The API is considered stable. Consumers using `^1.0.0` will automatically receive all non-breaking updates.
+- **latticesql ^1.0.0** — updated dependency to latticesql 1.0.
+
+## [0.6.0] — 2026-04-04
+
+### Removed
+
+- **HeartbeatScheduler** — Deleted deprecated in-memory heartbeat scheduler. Use `Scheduler` (database-backed, cron-based) instead.
+- **LATTICE-GAPS.md** — Removed internal gap-tracking document from docs.
+
+### Changed
+
+- **Full documentation rewrite** — All docs rewritten with correct import paths (`from 'botinabox'`), practical code examples, and complete API coverage. Added new `docs/connectors.md` for Google Gmail/Calendar integration.
+- **README** — Rewritten with correct single-package structure, quick start, architecture diagram, and core concepts.
+
 ## [0.5.6] — 2026-04-04
 
 ### Added
