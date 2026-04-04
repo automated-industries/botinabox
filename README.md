@@ -241,6 +241,12 @@ botinabox/
 └── tsconfig.json
 ```
 
+## Staying up to date
+
+**CLI users:** The `botinabox` CLI checks for new versions automatically and prints a notice when an update is available. Run `botinabox update` to upgrade in place. Alternatively, use `npx botinabox` to always run the latest version without a global install.
+
+**Library consumers:** By default, `npm install botinabox` adds a `^` semver range to your `package.json`, so patch and minor updates are picked up on your next `npm install`. For fully automated dependency updates, set up [Dependabot](https://docs.github.com/en/code-security/dependabot) or [Renovate](https://github.com/renovatebot/renovate) — they'll create PRs in your repo whenever a new version is published.
+
 ## License
 
 MIT

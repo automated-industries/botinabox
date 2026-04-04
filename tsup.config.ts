@@ -9,6 +9,8 @@ export default defineConfig({
     'channels/slack/index': 'src/channels/slack/index.ts',
     'channels/discord/index': 'src/channels/discord/index.ts',
     'channels/webhook/index': 'src/channels/webhook/index.ts',
+    'connectors/google/index': 'src/connectors/google/index.ts',
+    'cli': 'src/cli.ts',
   },
   format: ['esm'],
   dts: true,

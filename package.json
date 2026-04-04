@@ -1,6 +1,6 @@
 {
   "name": "botinabox",
-  "version": "0.4.0",
+  "version": "0.5.4",
   "description": "Bot in a Box — framework for building multi-agent bots",
   "type": "module",
   "main": "./dist/index.js",
@@ -33,25 +33,39 @@
     "./webhook": {
       "import": "./dist/channels/webhook/index.js",
       "types": "./dist/channels/webhook/index.d.ts"
+    },
+    "./google": {
+      "import": "./dist/connectors/google/index.js",
+      "types": "./dist/connectors/google/index.d.ts"
     }
   },
   "bin": {
     "botinabox": "./bin/botinabox.mjs"
   },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run typecheck && npm test"
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
     "ajv": "^8.17.1",
+    "cron-parser": "^4.9.0",
     "latticesql": "^0.18.0",
     "uuid": "^13.0.0",
     "yaml": "^2.7.0"
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
+    "googleapis": ">=140.0.0",
     "openai": "^4.104.0"
   },
   "peerDependenciesMeta": {
@@ -60,12 +74,16 @@
     },
     "openai": {
       "optional": true
+    },
+    "googleapis": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
+    "googleapis": "^171.4.0",
     "openai": "^4.104.0",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",

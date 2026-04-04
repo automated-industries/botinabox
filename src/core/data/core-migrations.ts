@@ -14,4 +14,32 @@ export const CORE_MIGRATIONS: Array<{ version: string; sql: string }> = [
     version: "003_runs_cost_index",
     sql: `CREATE INDEX IF NOT EXISTS idx_runs_cost ON runs(agent_id, completed_at) WHERE cost_cents > 0;`,
   },
+  {
+    version: "004_schedules_table",
+    sql: `CREATE TABLE IF NOT EXISTS schedules (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            type TEXT NOT NULL DEFAULT 'recurring',
+            cron TEXT,
+            run_at TEXT,
+            timezone TEXT DEFAULT 'UTC',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            action TEXT NOT NULL,
+            action_config TEXT DEFAULT '{}',
+            last_fired_at TEXT,
+            next_fire_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            deleted_at TEXT
+          )`,
+  },
+  {
+    version: "005_schedules_name_index",
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_schedules_name ON schedules(name) WHERE deleted_at IS NULL`,
+  },
+  {
+    version: "006_schedules_next_index",
+    sql: `CREATE INDEX IF NOT EXISTS idx_schedules_next ON schedules(enabled, next_fire_at) WHERE deleted_at IS NULL`,
+  },
 ];
