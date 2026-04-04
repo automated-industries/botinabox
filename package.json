@@ -1,6 +1,6 @@
 {
   "name": "botinabox",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Bot in a Box — framework for building multi-agent bots",
   "type": "module",
   "main": "./dist/index.js",
@@ -78,6 +78,10 @@
     "googleapis": {
       "optional": true
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/automated-industries/botinabox.git"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.52.0",

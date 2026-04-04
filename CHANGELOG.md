@@ -6,7 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
-## [0.5.4] — 2026-04-04
+## [0.5.5] — 2026-04-04
 
 ### Added
 
@@ -14,6 +14,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - **`botinabox update` command** — self-update to the latest version from npm.
 - **`botinabox --version` flag** — print current version.
 - **CI/CD pipelines** — GitHub Actions for CI (typecheck, test, build on push/PR) and automated npm publishing with provenance on tag push.
+
+### Fixed
+
+- **cost-tracker** — uses correct `ModelInfo` field names (`inputCostPerMToken`/`outputCostPerMToken`).
 
 ## [0.5.3] — 2026-04-04
 
