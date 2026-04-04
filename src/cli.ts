@@ -8,7 +8,7 @@
  */
 import * as readline from "node:readline";
 import * as fs from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { checkForUpdate } from "./update-check.js";
 
 function getVersion(): string {
@@ -71,7 +71,7 @@ async function runUpdate(currentVersion: string): Promise<void> {
 
   console.log(`Updating to ${latest}...`);
   try {
-    execSync("npm install -g botinabox@latest", { stdio: "inherit" });
+    execFileSync("npm", ["install", "-g", "botinabox@latest"], { stdio: "inherit" });
     console.log(`Updated botinabox ${currentVersion} → ${latest}`);
   } catch {
     console.error("Update failed. Try running manually: npm install -g botinabox@latest");

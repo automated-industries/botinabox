@@ -51,6 +51,10 @@ export class DataStore {
     for (const stmt of def.tableConstraints ?? []) {
       const upper = stmt.trimStart().toUpperCase();
       if (upper.startsWith('CREATE ') || upper.startsWith('DROP ') || upper.startsWith('ALTER ')) {
+        // Prevent multi-statement injection via semicolons
+        if (stmt.includes(';')) {
+          throw new DataStoreError(`Deferred DDL statement must not contain semicolons: ${stmt}`);
+        }
         this.deferredStatements.push(stmt);
       } else {
         inlineConstraints.push(stmt);
@@ -75,8 +79,12 @@ export class DataStore {
     this.lattice.defineEntityContext(name, {
       slug: (row: Row) => {
         const val = row[def.slugColumn];
-        if (val == null) return String(row.id ?? row.name ?? 'unknown');
-        return String(val);
+        const raw = val == null ? String(row.id ?? row.name ?? 'unknown') : String(val);
+        // Validate: no path traversal characters
+        if (raw.includes('/') || raw.includes('\\') || raw.includes('..')) {
+          throw new Error(`Invalid slug "${raw}": contains path traversal characters`);
+        }
+        return raw;
       },
       directoryRoot: def.directory,
       files: def.files as Record<string, import('latticesql').EntityFileSpec>,
@@ -92,12 +100,14 @@ export class DataStore {
             outputFile: def.indexFile,
             render: def.indexRender ?? ((rows: Row[]) => {
               const active = rows.filter((r) => r.deleted_at == null);
-              const title = def.directory.charAt(0).toUpperCase() + def.directory.slice(1);
+              const dir = def.directory;
+              const title = dir.charAt(0).toUpperCase() + dir.slice(1);
               if (!active.length) return `# ${title}\n\nNone.\n`;
               const lines = active.map((r) => {
-                const name = String(r.name ?? r[def.slugColumn] ?? r.id ?? 'unknown');
+                const slug = String(r[def.slugColumn] ?? r.name ?? r.id ?? 'unknown');
+                const name = String(r.name ?? slug);
                 const status = r.status ? ` (${r.status})` : '';
-                return `- **${name}**${status}`;
+                return `- [${name}](${dir}/${slug}/)${status}`;
               });
               return `# ${title}\n\n${lines.join('\n')}\n`;
             }),

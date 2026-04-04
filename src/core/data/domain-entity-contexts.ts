@@ -1,5 +1,6 @@
 import type { DataStore } from "./data-store.js";
 import type { Row } from "./types.js";
+import { truncateAtWord } from "../../shared/utils.js";
 
 /**
  * Options for domain entity context generation.
@@ -77,6 +78,7 @@ export function defineDomainEntityContexts(
   });
 
   // --- Project context ---
+  // PROJECT.md auto-combines with all connected context (latticesql 1.2.0+).
   db.defineEntityContext("project", {
     table: "project",
     directory: "projects",
@@ -149,10 +151,33 @@ export function defineDomainEntityContexts(
             },
           }
         : {}),
+      "MESSAGES.md": {
+        source: {
+          type: "hasMany" as const,
+          table: "messages",
+          foreignKey: "project_id",
+          orderBy: "created_at",
+          limit: 100,
+        },
+        render: (rows: Row[]) => {
+          if (!rows.length) return "# Messages\n\nNo messages.\n";
+          const lines = rows.map((r) => {
+            const dir = r.direction === "inbound" ? "\u2192" : "\u2190";
+            const ts = ((r.created_at as string) ?? "").slice(0, 16);
+            const agent = r.from_agent ? ` [${r.from_agent}]` : "";
+            const body = (r.body as string) ?? "";
+            const preview = truncateAtWord(body, 150);
+            return `- ${dir} **${ts}**${agent} ${preview}`;
+          });
+          return `# Messages\n\n${lines.join("\n")}\n`;
+        },
+        omitIfEmpty: false,
+      },
     },
   });
 
   // --- Client context ---
+  // CLIENT.md auto-combines with all connected context (latticesql 1.2.0+).
   if (opts.clients) {
     db.defineEntityContext("client", {
       table: "client",

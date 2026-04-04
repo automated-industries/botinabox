@@ -5,3 +5,4 @@ export { BackupManager } from './backup-manager.js';
 export { UpdateManager } from './update-manager.js';
 export { runPackageMigrations } from './migration-hooks.js';
 export type { PackageMigration } from './migration-hooks.js';
+export { autoUpdate } from './auto-update.js';

@@ -5,7 +5,7 @@
  * it emits the schedule's `action` as a hook event with the
  * `action_config` payload. Consumers subscribe to handle the action.
  *
- * Replaces HeartbeatScheduler for recurring use cases.
+ * Supports one-time and recurring use cases.
  */
 
 import cronParser from "cron-parser";
@@ -102,12 +102,17 @@ export class Scheduler {
     for (const schedule of schedules) {
       try {
         const config = JSON.parse(schedule.action_config || "{}");
+        // Filter prototype pollution vectors
+        const safeConfig: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(config)) {
+          if (!k.startsWith('__')) safeConfig[k] = v;
+        }
 
         // Emit the action hook (e.g. 'connector.sync', 'channel.send')
         await this.hooks.emit(schedule.action, {
           schedule_id: schedule.id,
           schedule_name: schedule.name,
-          ...config,
+          ...safeConfig,
         });
 
         // Emit observability hook

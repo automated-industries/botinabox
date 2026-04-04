@@ -4,248 +4,177 @@ A modular TypeScript framework for building multi-agent bots with LLM orchestrat
 
 ## Features
 
-- **Multi-agent orchestration** — Define agents with different models, roles, and execution adapters. Task queue with priority scheduling, retry policies, and followup chains.
-- **LLM provider abstraction** — Swap between Anthropic, OpenAI, and Ollama with a unified interface. Model aliasing, purpose-based routing, and fallback chains.
-- **Channel adapters** — Connect to Slack, Discord, and webhooks. Auto-discovery, session management, and notification queuing.
-- **Workflow engine** — Define multi-step workflows with dependency resolution, parallel execution, and conditional branching.
-- **SQLite data layer** — Schema-driven tables, migrations, entity context rendering, and query builder. WAL mode for concurrent reads.
-- **Event-driven hooks** — Priority-ordered, filter-based event bus for decoupled inter-layer communication.
-- **Budget controls** — Per-agent and global cost tracking with warning thresholds and hard stops.
-- **Protected primitives** — Users and secrets are first-class, privacy-isolated objects. User identity resolution across channels. Secrets with optional AES-256-GCM at-rest encryption.
-- **Security** — Input sanitization, field length enforcement, audit logging, and HMAC webhook verification.
-- **Self-updating** — Built-in update checker with configurable policies and maintenance windows.
+- **Multi-agent orchestration** -- Define agents with different models, roles, and execution adapters. Task queue with priority scheduling, retry policies, and followup chains.
+- **LLM provider abstraction** -- Swap between Anthropic, OpenAI, and Ollama with a unified interface. Model aliasing, purpose-based routing, and fallback chains.
+- **Channel adapters** -- Connect to Slack, Discord, and webhooks. Auto-discovery, session management, and notification queuing.
+- **Workflow engine** -- Define multi-step workflows with dependency resolution, parallel execution, and conditional branching.
+- **SQLite data layer** -- Schema-driven tables, migrations, entity context rendering, and query builder via [latticesql](https://github.com/automated-industries/lattice). WAL mode for concurrent reads.
+- **Event-driven hooks** -- Priority-ordered, filter-based event bus for decoupled inter-layer communication.
+- **Budget controls** -- Per-agent and global cost tracking with warning thresholds and hard stops.
+- **Scheduling** -- Database-backed cron and one-time schedules that fire hook events.
+- **Connectors** -- Generic `Connector<T>` interface for external service integrations. Ships with Google Gmail and Calendar implementations (OAuth2 and service account auth).
+- **Domain tables** -- `defineDomainTables()` and `defineDomainEntityContexts()` for standard multi-agent app schemas (org, project, client, invoice, repository, and more).
+- **Auto-update** -- `autoUpdate()` checks npm for newer versions and installs them at startup.
+- **Cursor persistence** -- `SecretStore.loadCursor()` / `saveCursor()` for persisting sync state across restarts.
+- **Utilities** -- `truncateAtWord()` for word-boundary text truncation, `parseClaudeStream()`, `buildProcessEnv()`, and more.
+- **Security** -- Input sanitization, field length enforcement, audit logging, and HMAC webhook verification.
 
-## Packages
+## Install
 
-| Package | Description |
-|---------|-------------|
-| [`@botinabox/core`](packages/core) | Core framework — config, data, hooks, LLM, orchestration, chat, security |
-| [`@botinabox/shared`](packages/shared) | Shared types, interfaces, and constants (zero dependencies) |
-| [`@botinabox/cli`](packages/cli) | CLI tool for scaffolding new projects |
-| [`@botinabox/provider-anthropic`](packages/providers/anthropic) | Anthropic Claude provider |
-| [`@botinabox/provider-openai`](packages/providers/openai) | OpenAI GPT provider |
-| [`@botinabox/provider-ollama`](packages/providers/ollama) | Ollama local model provider |
-| [`@botinabox/channel-slack`](packages/channels/slack) | Slack channel adapter |
-| [`@botinabox/channel-discord`](packages/channels/discord) | Discord channel adapter |
-| [`@botinabox/channel-webhook`](packages/channels/webhook) | Webhook channel adapter with HMAC verification |
+```bash
+npm install botinabox
+```
+
+Install peer dependencies for the providers you need:
+
+```bash
+# For Anthropic
+npm install @anthropic-ai/sdk
+
+# For OpenAI
+npm install openai
+
+# For Google connectors
+npm install googleapis
+```
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 20+
-- pnpm 9+
-
-### Install
-
-```bash
-git clone https://github.com/automated-industries/botinabox.git
-cd botinabox
-pnpm install
-pnpm build
-```
-
-### Create a Project
-
-```bash
-npx botinabox init my-bot
-cd my-bot
-```
-
-This generates a project with a config file, environment template, and entry point.
-
-### Configure
-
-Edit `botinabox.config.yml`:
-
-```yaml
-data:
-  path: ./data/bot.db
-  walMode: true
-
-channels:
-  slack:
-    enabled: true
-    botToken: ${SLACK_BOT_TOKEN}
-
-providers:
-  anthropic:
-    enabled: true
-    apiKey: ${ANTHROPIC_API_KEY}
-
-agents:
-  - slug: assistant
-    name: Assistant
-    adapter: api
-    model: smart
-
-models:
-  default: claude-sonnet-4-6
-  aliases:
-    fast: claude-haiku-4-5
-    smart: claude-opus-4-6
-    balanced: claude-sonnet-4-6
-  routing:
-    conversation: fast
-    task_execution: smart
-    classification: fast
-  fallbackChain: []
-```
-
-Set environment variables in `.env`:
-
-```bash
-ANTHROPIC_API_KEY=your_key_here
-SLACK_BOT_TOKEN=xoxb-your-token
-```
-
-### Run
-
 ```typescript
-import { HookBus } from '@botinabox/core';
-import { loadConfig } from '@botinabox/core';
-import { DataStore, defineCoreTables } from '@botinabox/core';
-import { ProviderRegistry, ModelRouter } from '@botinabox/core';
-import { AgentRegistry, TaskQueue, RunManager } from '@botinabox/core';
-import { ChannelRegistry, MessagePipeline } from '@botinabox/core';
-import createAnthropicProvider from '@botinabox/provider-anthropic';
-import createSlackAdapter from '@botinabox/channel-slack';
+import {
+  HookBus,
+  DataStore,
+  defineCoreTables,
+  AgentRegistry,
+  TaskQueue,
+  RunManager,
+} from 'botinabox';
 
-// Load config
-const { config } = loadConfig({ configPath: 'botinabox.config.yml' });
-
-// Initialize systems
+// 1. Create core services
 const hooks = new HookBus();
-const db = new DataStore({ dbPath: config.data.path, wal: config.data.walMode, hooks });
+const db = new DataStore({ dbPath: './data/bot.db', wal: true, hooks });
+
+// 2. Define tables and initialize
 defineCoreTables(db);
-db.init();
+await db.init();
 
-// LLM providers
-const providers = new ProviderRegistry();
-providers.register(createAnthropicProvider({ apiKey: process.env.ANTHROPIC_API_KEY! }));
-const router = new ModelRouter(providers, config.models);
-
-// Channels
-const channels = new ChannelRegistry();
-channels.register(createSlackAdapter(), config.channels.slack);
-
-// Orchestration
+// 3. Set up orchestration
 const agents = new AgentRegistry(db, hooks);
 const tasks = new TaskQueue(db, hooks);
 const runs = new RunManager(db, hooks);
-const pipeline = new MessagePipeline(hooks, agents, tasks, config);
 
-// Start
-tasks.startPolling();
-await channels.start();
+// 4. Register an agent
+const agentId = await agents.register({
+  slug: 'assistant',
+  name: 'Assistant',
+  adapter: 'api',
+  role: 'general',
+});
+
+// 5. Listen for task creation
+hooks.register('task.created', async (ctx) => {
+  console.log(`Task created: ${ctx.taskId}`);
+});
+
+// 6. Create a task
+const taskId = await tasks.create({
+  title: 'Summarize the quarterly report',
+  description: 'Read the Q4 report and produce a 3-paragraph summary.',
+  assignee_id: agentId,
+  priority: 3,
+});
+
+// 7. Wire up task completion hooks
+hooks.register('run.completed', async (ctx) => {
+  console.log(`Run finished for task ${ctx.taskId}, exit code: ${ctx.exitCode}`);
+});
 ```
+
+## Subpath Exports
+
+| Import path | Description |
+|---|---|
+| `botinabox` | Core framework -- HookBus, DataStore, AgentRegistry, TaskQueue, RunManager, ChannelRegistry, MessagePipeline, Scheduler, config, security, and all shared types |
+| `botinabox/anthropic` | Anthropic Claude provider (`createAnthropicProvider`) |
+| `botinabox/openai` | OpenAI GPT provider (`createOpenAIProvider`) |
+| `botinabox/ollama` | Ollama local model provider (`createOllamaProvider`) |
+| `botinabox/slack` | Slack channel adapter (`SlackAdapter`) |
+| `botinabox/discord` | Discord channel adapter (`DiscordAdapter`) |
+| `botinabox/webhook` | Webhook channel adapter with HMAC verification (`WebhookAdapter`) |
+| `botinabox/google` | Google connectors -- Gmail and Calendar via OAuth2 |
 
 ## Architecture
 
 ```
-                    ┌─────────────────────────────────────┐
-                    │           Channel Adapters           │
-                    │     Slack  ·  Discord  ·  Webhook    │
-                    └──────────────┬──────────────────────┘
-                                   │ InboundMessage
-                    ┌──────────────▼──────────────────────┐
-                    │         Message Pipeline             │
-                    │   routing · policies · sessions      │
-                    └──────────────┬──────────────────────┘
-                                   │ Task
-                    ┌──────────────▼──────────────────────┐
-                    │          Task Queue                  │
-                    │  priority · retry · followup chains  │
-                    └──────────────┬──────────────────────┘
-                                   │
-                    ┌──────────────▼──────────────────────┐
-                    │          Run Manager                 │
-                    │    locking · retries · cost tracking │
-                    └──────────────┬──────────────────────┘
-                                   │
-              ┌────────────────────┼────────────────────┐
-              ▼                    ▼                    ▼
-    ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐
-    │  CLI Adapter     │  │  API Adapter     │  │  Custom       │
-    │  (subprocess)    │  │  (LLM + tools)   │  │  Adapters     │
-    └─────────────────┘  └────────┬─────────┘  └──────────────┘
-                                  │
-                    ┌─────────────▼───────────────────────┐
-                    │         LLM Layer                    │
-                    │  ProviderRegistry · ModelRouter       │
-                    │  CostTracker · Tool Loop              │
-                    └─────────────┬───────────────────────┘
-                                  │
-              ┌───────────────────┼───────────────────┐
-              ▼                   ▼                   ▼
-    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-    │  Anthropic    │    │  OpenAI       │    │  Ollama       │
-    └──────────────┘    └──────────────┘    └──────────────┘
+                    +-------------------------------------+
+                    |           Channel Adapters           |
+                    |     Slack  .  Discord  .  Webhook    |
+                    +--------------+-----------------------+
+                                   | InboundMessage
+                    +--------------v-----------------------+
+                    |         Message Pipeline              |
+                    |   routing . policies . sessions       |
+                    +--------------+-----------------------+
+                                   | Task
+                    +--------------v-----------------------+
+                    |          Task Queue                   |
+                    |  priority . retry . followup chains   |
+                    +--------------+-----------------------+
+                                   |
+                    +--------------v-----------------------+
+                    |          Run Manager                  |
+                    |    locking . retries . cost tracking  |
+                    +--------------+-----------------------+
+                                   |
+              +--------------------+--------------------+
+              v                    v                    v
+    +------------------+  +------------------+  +---------------+
+    |  CLI Adapter      |  |  API Adapter      |  |  Custom       |
+    |  (subprocess)     |  |  (LLM + tools)    |  |  Adapters     |
+    +------------------+  +--------+----------+  +---------------+
+                                   |
+                    +--------------v-----------------------+
+                    |         LLM Layer                     |
+                    |  ProviderRegistry . ModelRouter        |
+                    |  BudgetController . Tool Loop          |
+                    +--------------+-----------------------+
+                                   |
+              +--------------------+-------------------+
+              v                    v                   v
+    +---------------+    +---------------+    +---------------+
+    |  Anthropic     |    |  OpenAI        |    |  Ollama        |
+    +---------------+    +---------------+    +---------------+
 ```
 
-Cross-cutting concerns — **HookBus** (events), **DataStore** (persistence), **Security** (sanitization + audit) — connect all layers.
+Cross-cutting concerns -- **HookBus** (events), **DataStore** (persistence), **Security** (sanitization + audit) -- connect all layers.
+
+## Core Concepts
+
+**HookBus** is the central event bus. Handlers subscribe to named events with optional priority ordering and payload filters. Errors in one handler never block others. Use it to decouple layers -- the task queue emits `task.created`, the run manager emits `run.completed`, channels emit `message.inbound`, and your application code listens to whichever events it needs.
+
+**DataStore** wraps [latticesql](https://github.com/automated-industries/lattice) to provide schema-driven SQLite persistence. You call `db.define()` to register table schemas, then `db.init()` to create them. It supports insert, update, upsert, get, query, delete, and migrations. WAL mode is enabled by default for concurrent read access.
+
+**AgentRegistry** manages the lifecycle of agents -- registration, status transitions (idle/running/paused/terminated), configuration revisions, and activity logging. Each agent has a slug, name, adapter type, role, and optional budget. Agents are stored in the database and can be seeded from config on startup.
+
+**TaskQueue** is a priority-ordered work queue backed by SQLite. Tasks have a title, description, assignee, priority (1-10), and support retry policies and followup chains. Chain depth is enforced to prevent infinite recursion. The queue emits `task.created` on the HookBus and supports polling for stale tasks.
+
+**RunManager** handles task execution lifecycle. It acquires a per-agent lock, creates a run record, delegates to an execution adapter (API or CLI), and records the result including exit code, cost, and token usage. Failed runs trigger retry logic with exponential backoff.
+
+**ChannelRegistry** manages channel adapter connections. Register adapters (Slack, Discord, webhook) with their config, then call `start()` to connect them all. Supports hot reconfiguration, health checks, and graceful shutdown.
+
+**MessagePipeline** routes inbound messages from channels to the task queue. It resolves the sender to a user identity, picks the right agent based on channel bindings, applies policy checks (allowlists, mention gates), and creates a task for the assigned agent.
+
+**Scheduler** provides database-backed job scheduling with cron expressions. Register recurring or one-time schedules that emit hook events when they fire. The scheduler polls for due jobs and emits the schedule's `action` as a hook event with its configured payload.
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) — Installation, project setup, first bot
-- [Configuration](docs/configuration.md) — Full config reference
-- [Architecture](docs/architecture.md) — System design and patterns
-- [Providers](docs/providers.md) — LLM provider setup and custom providers
-- [Channels](docs/channels.md) — Channel adapter setup and custom adapters
-- [Orchestration](docs/orchestration.md) — Agents, tasks, workflows, and budget controls
-- [API Reference](docs/api-reference.md) — Complete API documentation
-
-## Development
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build all packages
-pnpm build
-
-# Run all tests
-pnpm test:run
-
-# Type-check
-pnpm typecheck
-```
-
-### Project Structure
-
-```
-botinabox/
-├── packages/
-│   ├── core/              # Core framework
-│   │   └── src/
-│   │       ├── config/    # YAML config loader + validation
-│   │       ├── data/      # SQLite ORM, migrations, entity rendering
-│   │       ├── hooks/     # Event bus
-│   │       ├── llm/       # Provider registry, model router, cost tracking
-│   │       ├── chat/      # Channel registry, message pipeline, sessions
-│   │       ├── orchestrator/  # Agents, tasks, runs, workflows, adapters
-│   │       ├── security/  # Sanitizer, audit, column validation
-│   │       └── update/    # Self-update system
-│   ├── shared/            # Types and constants (zero deps)
-│   ├── cli/               # CLI scaffolding tool
-│   ├── providers/
-│   │   ├── anthropic/     # Claude models
-│   │   ├── openai/        # GPT models
-│   │   └── ollama/        # Local models
-│   └── channels/
-│       ├── slack/         # Slack adapter
-│       ├── discord/       # Discord adapter
-│       └── webhook/       # Webhook adapter + HMAC
-├── package.json
-├── pnpm-workspace.yaml
-└── tsconfig.json
-```
-
-## Staying up to date
-
-**CLI users:** The `botinabox` CLI checks for new versions automatically and prints a notice when an update is available. Run `botinabox update` to upgrade in place. Alternatively, use `npx botinabox` to always run the latest version without a global install.
-
-**Library consumers:** By default, `npm install botinabox` adds a `^` semver range to your `package.json`, so patch and minor updates are picked up on your next `npm install`. For fully automated dependency updates, set up [Dependabot](https://docs.github.com/en/code-security/dependabot) or [Renovate](https://github.com/renovatebot/renovate) — they'll create PRs in your repo whenever a new version is published.
+- [Getting Started](docs/getting-started.md) -- Installation, project setup, first bot
+- [Configuration](docs/configuration.md) -- Full config reference
+- [Architecture](docs/architecture.md) -- System design and patterns
+- [Providers](docs/providers.md) -- LLM provider setup and custom providers
+- [Channels](docs/channels.md) -- Channel adapter setup and custom adapters
+- [Orchestration](docs/orchestration.md) -- Agents, tasks, workflows, and budget controls
+- [API Reference](docs/api-reference.md) -- Complete API documentation
 
 ## License
 

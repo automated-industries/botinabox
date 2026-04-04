@@ -145,3 +145,114 @@ describe("formatForSlack — Story 4.5", () => {
     expect(formatForSlack("`code`")).toBe("`code`");
   });
 });
+
+describe("Voice message parsing", () => {
+  it("extracts transcript from voice message with transcription.preview.content", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000001",
+      channel: "D123",
+      user: "U123",
+      text: "",
+      files: [{
+        id: "F1",
+        filetype: "aac",
+        subtype: "slack_audio",
+        transcription: { status: "complete", preview: { content: "Deploy the new build today" } },
+      }],
+    });
+    expect(msg.body).toBe("[Voice message] Deploy the new build today");
+  });
+
+  it("falls back to file preview when transcription is unavailable", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000002",
+      channel: "D123",
+      user: "U123",
+      text: "",
+      files: [{
+        id: "F2",
+        filetype: "m4a",
+        subtype: "slack_audio",
+        preview: "Check the server logs",
+      }],
+    });
+    expect(msg.body).toBe("[Voice message] Check the server logs");
+  });
+
+  it("appends voice transcript to existing text body", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000003",
+      channel: "D123",
+      user: "U123",
+      text: "See attached",
+      files: [{
+        id: "F3",
+        filetype: "aac",
+        subtype: "slack_audio",
+        transcription: { status: "complete", preview: { content: "Here is more context" } },
+      }],
+    });
+    expect(msg.body).toContain("See attached");
+    expect(msg.body).toContain("[Voice message] Here is more context");
+  });
+
+  it("marks voice message for local transcription when no Slack transcript", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000004",
+      channel: "D123",
+      user: "U123",
+      text: "",
+      files: [{
+        id: "F4",
+        filetype: "aac",
+        subtype: "slack_audio",
+      }],
+    });
+    expect(msg.body).toBe("[Voice message — no transcript available]");
+  });
+
+  it("ignores non-audio file_share events", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000005",
+      channel: "D123",
+      user: "U123",
+      text: "Here is a document",
+      files: [{
+        id: "F5",
+        filetype: "pdf",
+        url_private: "https://files.slack.com/doc.pdf",
+      }],
+    });
+    expect(msg.body).toBe("Here is a document");
+  });
+
+  it("extractVoiceTranscript returns null for non-audio files", async () => {
+    const { extractVoiceTranscript } = await import("../inbound.js");
+    expect(extractVoiceTranscript({ filetype: "pdf" })).toBeNull();
+    expect(extractVoiceTranscript({ filetype: "png" })).toBeNull();
+  });
+
+  it("extractVoiceTranscript returns transcript for audio files", async () => {
+    const { extractVoiceTranscript } = await import("../inbound.js");
+    expect(extractVoiceTranscript({
+      filetype: "aac",
+      subtype: "slack_audio",
+      transcription: { status: "complete", preview: { content: "Hello world" } },
+    })).toBe("Hello world");
+  });
+});

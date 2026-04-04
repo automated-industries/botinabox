@@ -1,5 +1,6 @@
 import type { DataStore } from "./data-store.js";
 import type { Row } from "./types.js";
+import { truncateAtWord } from "../../shared/utils.js";
 
 /**
  * Define default entity context rendering for botinabox core tables.
@@ -112,7 +113,7 @@ export function defineCoreEntityContexts(db: DataStore): void {
         const dir = r.direction === "outbound" ? "→" : "←";
         const who = (r.from_agent as string) ?? (r.from_user as string) ?? "unknown";
         const time = ((r.created_at as string) ?? "").slice(0, 16);
-        const preview = ((r.body as string) ?? "").slice(0, 80);
+        const preview = truncateAtWord((r.body as string) ?? "", 80);
         return `- ${dir} **${who}** (${time}): ${preview}`;
       });
       return `# Messages\n\nLast ${lines.length} messages:\n\n${lines.join("\n")}\n`;
