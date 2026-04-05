@@ -5,6 +5,12 @@ A modular TypeScript framework for building multi-agent bots with LLM orchestrat
 ## Features
 
 - **Multi-agent orchestration** -- Define agents with different models, roles, and execution adapters. Task queue with priority scheduling, retry policies, and followup chains.
+- **Two-tier agents** -- Deterministic adapter for tasks that don't need LLM reasoning (routing, validation, data fetching). API and CLI adapters for LLM-driven tasks.
+- **Triage routing** -- Content-aware message routing with keyword/regex matching, priority rules, and LLM fallback for ambiguous messages. Ownership chain logging for every routing decision.
+- **Loop detection and circuit breakers** -- Pattern-based loop detection (self-loops, ping-pong, blocked re-entry) plus circuit breakers with automatic human escalation when agents fail repeatedly.
+- **Learning pipeline** -- Structured feedback capture with auto-promotion: 3+ similar feedback records become a playbook, playbooks used by 3+ agents become reusable skills. Two-axis scoring (accuracy + efficiency).
+- **Governance gates** -- Independent QA, quality, and drift gates that validate agent output and report to the human operator. Gates run independently and cannot override each other.
+- **Permission relay** -- Remote approval for unattended agents via messaging platforms (Slack, Discord, Telegram). Dual approval: local terminal and remote, first response wins.
 - **LLM provider abstraction** -- Swap between Anthropic, OpenAI, and Ollama with a unified interface. Model aliasing, purpose-based routing, and fallback chains.
 - **Channel adapters** -- Connect to Slack, Discord, and webhooks. Auto-discovery, session management, and notification queuing.
 - **Workflow engine** -- Define multi-step workflows with dependency resolution, parallel execution, and conditional branching.
@@ -15,8 +21,6 @@ A modular TypeScript framework for building multi-agent bots with LLM orchestrat
 - **Connectors** -- Generic `Connector<T>` interface for external service integrations. Ships with Google Gmail and Calendar implementations (OAuth2 and service account auth).
 - **Domain tables** -- `defineDomainTables()` and `defineDomainEntityContexts()` for standard multi-agent app schemas (org, project, client, invoice, repository, and more).
 - **Auto-update** -- `autoUpdate()` checks npm for newer versions and installs them at startup.
-- **Cursor persistence** -- `SecretStore.loadCursor()` / `saveCursor()` for persisting sync state across restarts.
-- **Utilities** -- `truncateAtWord()` for word-boundary text truncation, `parseClaudeStream()`, `buildProcessEnv()`, and more.
 - **Security** -- Input sanitization, field length enforcement, audit logging, and HMAC webhook verification.
 
 ## Install
@@ -128,10 +132,10 @@ hooks.register('run.completed', async (ctx) => {
                                    |
               +--------------------+--------------------+
               v                    v                    v
-    +------------------+  +------------------+  +---------------+
-    |  CLI Adapter      |  |  API Adapter      |  |  Custom       |
-    |  (subprocess)     |  |  (LLM + tools)    |  |  Adapters     |
-    +------------------+  +--------+----------+  +---------------+
+    +------------------+  +------------------+  +------------------+
+    |  CLI Adapter      |  |  API Adapter      |  |  Deterministic   |
+    |  (subprocess)     |  |  (LLM + tools)    |  |  (no LLM)        |
+    +------------------+  +--------+----------+  +------------------+
                                    |
                     +--------------v-----------------------+
                     |         LLM Layer                     |

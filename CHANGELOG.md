@@ -6,6 +6,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [1.6.0] — 2026-04-05
+
+### Added
+
+- **Loop detection** — `LoopDetector` class scans agent routing history for self-loops, ping-pong patterns (A→B→A→B), and blocked re-entry. Complements the existing chain depth guard with active pattern detection.
+- **Circuit breaker** — `CircuitBreaker` class with CLOSED/OPEN/HALF_OPEN states, configurable failure thresholds, automatic human escalation via `circuit_breaker.tripped` hook, and manual reset. Emits `circuit_breaker.recovered` and `circuit_breaker.reset` events.
+- **RunManager + CircuitBreaker integration** — `RunManager.setCircuitBreaker(cb)` injects a circuit breaker. Failed runs record failures; successful runs record recovery. Retries are skipped when the circuit is open.
+- **Deterministic adapter** — `DeterministicAdapter` executes user-specified scripts (Python, Node, bash) without any LLM calls. For routing, validation, and data-fetching tasks that don't need reasoning. Supports stdin and arg input modes with configurable timeout.
+- **Triage routing** — `TriageRouter` replaces static channel→agent bindings with content-aware routing: keyword matching, regex patterns, priority ordering, and LLM fallback for ambiguous messages. Logs an ownership chain for every routing decision via `triage.routed` hook.
+- **Learning pipeline** — `LearningPipeline` class for turning execution experience into durable knowledge. Structured feedback capture with severity and two-axis scoring (accuracy + efficiency). Auto-promotes to playbook after 3+ similar feedback records. Promotes playbook to skill when used by 3+ agents. New tables: `feedback`, `playbooks`, `agent_playbooks`.
+- **Permission relay** — `PermissionRelay` posts approval prompts to messaging platforms and polls for responses. Provider interface for Slack/Discord/Telegram/SMS. Dual approval (local terminal + remote, first wins). Timeout and cancellation support.
+- **Governance gates** — `GovernanceGate` base class with `QAGate` (data correctness), `QualityGate` (code quality), and `DriftGate` (architectural drift). `GateRunner` orchestrates independent gates that report to the human operator, not to each other. Emits `governance.gate_completed` and `governance.review_completed` hooks.
+- **Agent context: SKILLS.md and PLAYBOOKS.md** — `defineCoreEntityContexts()` now renders per-agent SKILLS.md (via `agent_skills` junction) and PLAYBOOKS.md (via `agent_playbooks` junction) alongside the existing AGENT.md.
+
+### Changed
+
+- Core table count: 20 → 23 (added `feedback`, `playbooks`, `agent_playbooks`).
+
+### Deprecated
+
+- **`buildAgentBindings()`** — Use `TriageRouter` for content-aware routing with keyword/regex matching and LLM fallback. Static channel→agent bindings are kept for backward compatibility.
+
+## [1.5.0] — 2026-04-04
+
+### Fixed
+
+- **Message source links** — Messages in MESSAGES.md now render as `[timestamp](messages/{id}/)` linking to the source message object.
+- **Files in project context** — Projects now render FILES.md showing files linked via `file.project_id`.
+
 ## [1.4.2] — 2026-04-04
 
 ### Added

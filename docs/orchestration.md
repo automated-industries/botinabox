@@ -1014,6 +1014,199 @@ const grandchild = buildChainOrigin('task-456', 'task-123', 1);
 // { chain_origin_id: 'task-123', chain_depth: 2 }
 ```
 
+## 12. LoopDetector
+
+Scans agent routing history for patterns that indicate stuck loops. Complements the chain depth guard with active pattern detection.
+
+### Loop Types
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| `SELF_LOOP` | Agent routes to itself | Triage → Triage |
+| `PING_PONG` | Two agents bounce tasks | A → B → A → B |
+| `BLOCKED_REENTRY` | Task re-enters after being blocked | Agent B blocked, new task routes to B again |
+
+### Usage
+
+```typescript
+import { LoopDetector, LoopType } from 'botinabox';
+
+const detector = new LoopDetector(db, {
+  windowSize: 10,        // Recent tasks to scan
+  pingPongThreshold: 2,  // Repetitions to confirm ping-pong
+});
+
+// Check before creating a followup task
+const loop = await detector.check(sourceAgentId, targetAgentId, taskId, chainOriginId);
+if (loop) {
+  console.warn(loop.message);
+  // "Ping-pong detected: agents A and B are bouncing tasks in chain origin-1"
+}
+```
+
+## 13. CircuitBreaker
+
+Prevents runaway agent failures with automatic human escalation.
+
+### States
+
+```
+CLOSED ──(failures >= threshold)──► OPEN ──(timeout elapsed)──► HALF_OPEN
+  ▲                                                                 │
+  └──────────────────(success)──────────────────────────────────────┘
+```
+
+### Usage
+
+```typescript
+import { CircuitBreaker, BreakerState } from 'botinabox';
+
+const breaker = new CircuitBreaker(db, hooks, {
+  failureThreshold: 3,       // Failures before tripping
+  resetTimeoutMs: 300_000,   // 5 min before half-open probe
+});
+
+// Attach to RunManager for automatic tracking
+runs.setCircuitBreaker(breaker);
+
+// Or use manually
+if (breaker.canExecute(agentId)) {
+  // ... execute ...
+  await breaker.recordSuccess(agentId);
+} else {
+  // Circuit is OPEN — agent is broken, escalated to human
+}
+
+// Manual reset (after human review)
+await breaker.reset(agentId);
+```
+
+### Hook Events
+
+| Event | Payload | When |
+|-------|---------|------|
+| `circuit_breaker.tripped` | `{ agentId, reason, failureCount, action }` | Breaker opens |
+| `circuit_breaker.recovered` | `{ agentId, previousState }` | Success in half-open |
+| `circuit_breaker.reset` | `{ agentId }` | Manual reset |
+
+## 14. LearningPipeline
+
+Turns execution experience into durable knowledge via a promotion ladder: feedback → playbook → skill.
+
+### Feedback Capture
+
+```typescript
+import { LearningPipeline } from 'botinabox';
+
+const learning = new LearningPipeline(db, hooks, {
+  playbookThreshold: 3,  // Similar feedbacks to auto-promote
+  skillThreshold: 3,     // Agents using playbook to promote to skill
+  autoPromote: true,     // Auto-promote when thresholds met
+});
+
+await learning.captureFeedback({
+  agentId,
+  issue: 'Rate limit hit on external API',
+  rootCause: 'Missing retry backoff',
+  severity: 'medium',
+  repeatable: true,
+  accuracyScore: 0.8,
+  efficiencyScore: 0.3,
+});
+```
+
+### Promotion Flow
+
+```
+Feedback (3+ similar) → Playbook (generalized rule)
+Playbook (3+ agents) → Skill (reusable behavior)
+Skill → agent_skills junction → rendered in SKILLS.md
+```
+
+### Metrics
+
+```typescript
+const metrics = await learning.getMetrics(agentId);
+// { feedbackCount, avgAccuracy, avgEfficiency, playbookCount, skillCount }
+```
+
+## 15. GovernanceGates
+
+Independent validation gates that check agent output from different dimensions. Gates report to the human operator, not to each other.
+
+### Built-in Gates
+
+| Gate | Dimension | Use Case |
+|------|-----------|----------|
+| `QAGate` | Data correctness | Schema validation, row counts |
+| `QualityGate` | Code quality | Lint, test coverage |
+| `DriftGate` | Architecture | Unintended dependencies, scope creep |
+
+### Usage
+
+```typescript
+import { QAGate, QualityGate, GateRunner } from 'botinabox';
+
+const runner = new GateRunner([
+  new QAGate([{
+    name: 'non-empty',
+    validate: (output) => output.trim() ? [] : [{ severity: 'error', message: 'Empty output' }],
+  }]),
+  new QualityGate([{
+    name: 'no-todos',
+    check: async (output) => /TODO/i.test(output)
+      ? [{ severity: 'warning', message: 'Contains TODO' }]
+      : [],
+  }]),
+], hooks);
+
+const { passed, results } = await runner.runAll({
+  agentId, taskId, output: agentOutput,
+});
+// passed: true if no gate returned 'fail'
+```
+
+## 16. PermissionRelay
+
+Remote approval for unattended agent execution via messaging platforms.
+
+### Provider Interface
+
+```typescript
+import { PermissionRelay, PermissionProvider } from 'botinabox';
+
+// Implement a provider for your platform
+class SlackPermissionProvider implements PermissionProvider {
+  readonly id = 'slack';
+  async sendPrompt(prompt) { /* post to Slack */ }
+  async pollResponse(handle) { /* check for reaction */ }
+  async cancelPrompt(handle) { /* delete message */ }
+}
+
+const relay = new PermissionRelay(hooks, {
+  providers: [new SlackPermissionProvider()],
+  pollIntervalMs: 5_000,
+  timeoutMs: 300_000,
+});
+```
+
+### Dual Approval
+
+```typescript
+// Request approval from all providers — first response wins
+const response = await relay.requestApproval({
+  id: 'perm-1',
+  agentId,
+  action: 'Run bash command: rm -rf /tmp/cache',
+  requestedAt: new Date().toISOString(),
+});
+// response.status: 'approved' | 'denied'
+// response.respondedBy: 'local' | 'slack:U12345'
+
+// Or approve locally (cancels remote providers)
+await relay.approveLocally('perm-1', true);
+```
+
 ## Task Lifecycle: End-to-End
 
 Here is the complete lifecycle of a task from creation to completion:

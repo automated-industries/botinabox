@@ -138,6 +138,20 @@ workflow.completed --> Your handler: notify stakeholders
 | `secret.rotated` | `{ name, environment }` | SecretStore |
 | `secret.deleted` | `{ name, environment }` | SecretStore |
 | `cost.recorded` | `{ agentId, model, costCents }` | CostTracker |
+| `circuit_breaker.tripped` | `{ agentId, reason, failureCount, action }` | CircuitBreaker |
+| `circuit_breaker.recovered` | `{ agentId, previousState }` | CircuitBreaker |
+| `circuit_breaker.reset` | `{ agentId }` | CircuitBreaker |
+| `triage.routed` | `{ decision }` | TriageRouter |
+| `triage.classify` | `{ message, candidates, respond }` | TriageRouter |
+| `learning.feedback_captured` | `{ feedbackId, agentId, issue, severity }` | LearningPipeline |
+| `learning.playbook_promoted` | `{ playbookId, pattern, feedbackCount }` | LearningPipeline |
+| `learning.skill_promoted` | `{ skillId, name, slug }` | LearningPipeline |
+| `learning.skill_assigned` | `{ agentId, skillId }` | LearningPipeline |
+| `governance.gate_completed` | `{ gateId, verdict, agentId, taskId }` | GateRunner |
+| `governance.review_completed` | `{ passed, agentId, taskId, results }` | GateRunner |
+| `permission.requested` | `{ promptId, agentId, action }` | PermissionRelay |
+| `permission.responded` | `{ promptId, status, respondedBy }` | PermissionRelay |
+| `permission.expired` | `{ promptId, agentId }` | PermissionRelay |
 | `audit` | `{ table, action, ... }` | AuditEmitter |
 
 ## DataStore + LatticeSQL
@@ -158,7 +172,7 @@ const db = new DataStore({
   hooks,
 });
 
-// Register the 20 built-in tables
+// Register the 23 built-in tables
 defineCoreTables(db);
 
 // Define custom domain tables
@@ -200,6 +214,9 @@ await db.init({ migrations: [...] });
 | `update_history` | Package update tracking |
 | `skills` | Skill definitions |
 | `agent_skills` | Agent-skill junction table |
+| `feedback` | Structured execution feedback records |
+| `playbooks` | Generalized rules promoted from feedback |
+| `agent_playbooks` | Agent-playbook junction table |
 | `users` | User records (cross-channel identity) |
 | `user_identities` | Channel-specific user identities |
 | `schedules` | Cron and one-time schedule definitions |
@@ -309,9 +326,35 @@ The orchestration layer coordinates agents, tasks, runs, workflows, budgets, sch
 
 See [Orchestration](orchestration.md) for full API documentation with code examples.
 
+## Safety Layer
+
+### Loop Detection
+
+The `LoopDetector` scans agent routing history for patterns that indicate stuck loops:
+
+- **Self-loop** -- agent routes to itself
+- **Ping-pong** -- two agents bounce tasks between each other (A→B→A→B)
+- **Blocked re-entry** -- a task re-enters the system after being blocked
+
+This complements the chain depth guard (`MAX_CHAIN_DEPTH=5`) with active pattern detection. Use both: depth check first (fast, stateless), then loop detection (database-backed).
+
+### Circuit Breaker
+
+The `CircuitBreaker` tracks agent failures and prevents wasted retries on fundamentally broken agents:
+
+```
+CLOSED (normal) → OPEN (tripped, escalated to human) → HALF_OPEN (probe)
+```
+
+When attached to RunManager via `setCircuitBreaker()`, failed runs automatically record failures and successful runs record recovery. Retries are skipped when the circuit is open.
+
+### Governance Gates
+
+Independent validation gates that check agent output from different dimensions. Each gate reports to the human operator, not to other gates or agents. Built-in gates: QA (data correctness), Quality (code quality), Drift (architectural drift).
+
 ## Execution Adapters
 
-Two built-in execution adapters handle how agent tasks are actually carried out.
+Three built-in execution adapters handle how agent tasks are actually carried out.
 
 ### API Adapter (LLM Tool Loop)
 
@@ -366,12 +409,33 @@ Task Title + Description
     Output + Exit Code
 ```
 
+### Deterministic Adapter (No LLM)
+
+The `DeterministicAdapter` executes user-specified scripts without any LLM calls. For tasks that don't require reasoning: routing, validation, data fetching, file transforms.
+
+```
+Task context (JSON)
+        │
+        ▼ (stdin or arg)
+  ┌──────────────────┐
+  │  spawnProcess()   │
+  │  command: python   │
+  │  args: [script.py] │
+  └────────┬─────────┘
+           │
+    stdout captured
+           │
+           ▼
+    Output + Exit Code
+```
+
 ### Choosing an Adapter
 
 | Adapter | Use Case | Strengths |
 |---------|----------|-----------|
 | `api` | Conversational tasks, analysis, writing | In-process, tool-use, session history |
 | `cli` | Code tasks, file operations, builds | Full shell access, existing CLI tools |
+| `deterministic` | Routing, validation, data fetching | No LLM cost, fast, predictable |
 
 ## Data Flow: Message to Response
 

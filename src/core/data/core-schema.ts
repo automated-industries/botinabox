@@ -365,4 +365,55 @@ export function defineCoreTables(db: DataStore): void {
       "CREATE UNIQUE INDEX IF NOT EXISTS idx_secrets_name_env ON secrets(name, environment, org_id) WHERE deleted_at IS NULL",
     ],
   });
+
+  // --- Learning pipeline (v1.6.0) ---
+
+  db.define("feedback", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      agent_id: "TEXT NOT NULL",
+      task_id: "TEXT",
+      issue: "TEXT NOT NULL",
+      root_cause: "TEXT",
+      severity: "TEXT NOT NULL DEFAULT 'medium'",
+      repeatable: "INTEGER NOT NULL DEFAULT 0",
+      accuracy_score: "REAL",
+      efficiency_score: "REAL",
+      tags: "TEXT NOT NULL DEFAULT '[]'",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    },
+    tableConstraints: [
+      "CREATE INDEX IF NOT EXISTS idx_feedback_agent ON feedback(agent_id, created_at)",
+      "CREATE INDEX IF NOT EXISTS idx_feedback_issue ON feedback(issue)",
+    ],
+  });
+
+  db.define("playbooks", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      pattern: "TEXT NOT NULL",
+      rule: "TEXT NOT NULL",
+      feedback_ids: "TEXT NOT NULL DEFAULT '[]'",
+      project_scoped: "INTEGER NOT NULL DEFAULT 1",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      deleted_at: "TEXT",
+    },
+    tableConstraints: [
+      "CREATE INDEX IF NOT EXISTS idx_playbooks_pattern ON playbooks(pattern)",
+    ],
+  });
+
+  db.define("agent_playbooks", {
+    columns: {
+      agent_id: "TEXT NOT NULL",
+      playbook_id: "TEXT NOT NULL",
+      assigned_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    },
+    primaryKey: ["agent_id", "playbook_id"],
+    tableConstraints: [
+      "FOREIGN KEY (agent_id) REFERENCES agents(id)",
+      "FOREIGN KEY (playbook_id) REFERENCES playbooks(id)",
+    ],
+  });
 }

@@ -31,6 +31,7 @@ export function defineCoreEntityContexts(db: DataStore): void {
             `# ${a.name}`,
             "",
             a.role ? `**Role:** ${a.role}` : null,
+            a.adapter ? `**Adapter:** ${a.adapter}` : null,
             a.status ? `**Status:** ${a.status}` : null,
             a.cwd ? `**Working Directory:** ${a.cwd}` : null,
             a.reports_to ? `**Reports To:** ${a.reports_to}` : null,
@@ -38,6 +39,48 @@ export function defineCoreEntityContexts(db: DataStore): void {
           ]
             .filter(Boolean)
             .join("\n");
+        },
+      },
+      "SKILLS.md": {
+        source: {
+          type: "manyToMany",
+          junctionTable: "agent_skills",
+          localKey: "agent_id",
+          remoteKey: "skill_id",
+          remoteTable: "skills",
+        },
+        omitIfEmpty: true,
+        render: (rows: Row[]) => {
+          if (!rows.length) return "";
+          const lines = [`# Skills (${rows.length})`, ""];
+          for (const s of rows) {
+            lines.push(`## ${s.name}`);
+            if (s.category) lines.push(`**Category:** ${s.category}`);
+            if (s.description) lines.push("", s.description as string);
+            if (s.definition) lines.push("", "```", s.definition as string, "```");
+            lines.push("");
+          }
+          return lines.join("\n");
+        },
+      },
+      "PLAYBOOKS.md": {
+        source: {
+          type: "manyToMany",
+          junctionTable: "agent_playbooks",
+          localKey: "agent_id",
+          remoteKey: "playbook_id",
+          remoteTable: "playbooks",
+        },
+        omitIfEmpty: true,
+        render: (rows: Row[]) => {
+          if (!rows.length) return "";
+          const lines = [`# Playbooks (${rows.length})`, ""];
+          for (const pb of rows) {
+            lines.push(`## ${pb.pattern ?? pb.name ?? "Unnamed"}`);
+            if (pb.rule) lines.push("", pb.rule as string);
+            lines.push("");
+          }
+          return lines.join("\n");
         },
       },
     },

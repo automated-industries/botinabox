@@ -151,6 +151,25 @@ export function defineDomainEntityContexts(
             },
           }
         : {}),
+      ...(opts.files
+        ? {
+            "FILES.md": {
+              source: {
+                type: "hasMany" as const,
+                table: "file",
+                foreignKey: "project_id",
+              },
+              render: (rows: Row[]) => {
+                if (!rows.length) return "";
+                const lines = rows.map(
+                  (r) => `- [${r.name}](files/${r.name}/)${r.mime_type ? ` (${r.mime_type})` : ""}`,
+                );
+                return `# Files\n\n${lines.join("\n")}\n`;
+              },
+              omitIfEmpty: true,
+            },
+          }
+        : {}),
       "MESSAGES.md": {
         source: {
           type: "hasMany" as const,
@@ -167,7 +186,8 @@ export function defineDomainEntityContexts(
             const agent = r.from_agent ? ` [${r.from_agent}]` : "";
             const body = (r.body as string) ?? "";
             const preview = truncateAtWord(body, 150);
-            return `- ${dir} **${ts}**${agent} ${preview}`;
+            const link = `[${ts}](messages/${r.id}/)`;
+            return `- ${dir} **${link}**${agent} ${preview}`;
           });
           return `# Messages\n\n${lines.join("\n")}\n`;
         },
