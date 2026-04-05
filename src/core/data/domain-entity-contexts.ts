@@ -53,7 +53,7 @@ export function defineDomainEntityContexts(
   db.defineEntityContext("org", {
     table: "org",
     directory: "orgs",
-    slugColumn: "name",
+    slugColumn: "id",
     indexFile: "orgs/ORGS.md",
     files: {
       "ORG.md": {
@@ -82,7 +82,7 @@ export function defineDomainEntityContexts(
   db.defineEntityContext("project", {
     table: "project",
     directory: "projects",
-    slugColumn: "name",
+    slugColumn: "id",
     indexFile: "projects/PROJECTS.md",
     files: {
       "PROJECT.md": {
@@ -202,7 +202,7 @@ export function defineDomainEntityContexts(
     db.defineEntityContext("client", {
       table: "client",
       directory: "clients",
-      slugColumn: "name",
+      slugColumn: "id",
       indexFile: "clients/CLIENTS.md",
       files: {
         "CLIENT.md": {
@@ -287,7 +287,7 @@ export function defineDomainEntityContexts(
     db.defineEntityContext("file", {
       table: "file",
       directory: "files",
-      slugColumn: "name",
+      slugColumn: "id",
       indexFile: "files/FILES.md",
       files: {
         "FILE.md": {
@@ -317,7 +317,7 @@ export function defineDomainEntityContexts(
     db.defineEntityContext("channel", {
       table: "channel",
       directory: "channels",
-      slugColumn: "name",
+      slugColumn: "id",
       indexFile: "channels/CHANNELS.md",
       files: {
         "CHANNEL.md": {

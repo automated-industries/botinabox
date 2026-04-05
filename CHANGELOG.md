@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [1.8.1] — 2026-04-05
+
+### Fixed
+
+- **Entity context slug validation** — Switched all domain entity contexts (`org`, `project`, `client`, `channel`, `file`) and `users` from `name`-based slugs to `id`-based slugs. Names with spaces, unicode, or special characters caused "path traversal detected" errors during `db.render()` in cloud environments.
+
 ## [1.8.0] — 2026-04-05
 
 ### Added
