@@ -6,6 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [1.7.0] — 2026-04-05
+
+### Added
+
+- **Chat response layer** — `ChatResponder` class provides fast (<2s) conversational responses via a cheap LLM (Haiku). Rolling context window from thread history. All outbound messages filtered through LLM for human readability. LLM-based redundancy check suppresses duplicate messages. Full send pipeline: redundancy → filter → store → deliver. Emits `response.ready` and `response.suppressed` hooks.
+- **Message store** — `MessageStore` class with store-before-respond guarantee. Inbound messages and attachments are stored before any bot response. Outbound messages stored before sending. Thread history and recent outbound queries for context building and redundancy checking. Emits `message.stored` hook.
+- **Message interpretation** — `MessageInterpreter` class for async structured extraction from messages. Pluggable `Extractor` interface for custom data types. Built-in LLM extraction for tasks, memories, and user context. Stores extracted memories in the `memories` table. Emits `interpretation.completed` hook.
+- **`memories` core table** — Structured memory storage for notes, thoughts, voice memos, and user context. Fields: summary, contents, tags (JSON), category. Linked to messages and users. The deliberate catchall for unstructured information.
+- **`message_attachments` core table** — File storage linked to messages. Fields: file_type, filename, mime_type, contents (transcript/description/markdown), summary (one-line). Supports image, file, audio, and video types.
+
+### Changed
+
+- Core table count: 23 → 25 (added `memories`, `message_attachments`).
+
 ## [1.6.0] — 2026-04-05
 
 ### Added

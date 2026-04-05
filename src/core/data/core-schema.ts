@@ -416,4 +416,44 @@ export function defineCoreTables(db: DataStore): void {
       "FOREIGN KEY (playbook_id) REFERENCES playbooks(id)",
     ],
   });
+
+  // --- Chat layer (v1.7.0) ---
+
+  db.define("message_attachments", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      message_id: "TEXT NOT NULL",
+      file_type: "TEXT NOT NULL DEFAULT 'file'",
+      filename: "TEXT",
+      mime_type: "TEXT",
+      size_bytes: "INTEGER",
+      contents: "TEXT",
+      summary: "TEXT",
+      url: "TEXT",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    },
+    tableConstraints: [
+      "CREATE INDEX IF NOT EXISTS idx_message_attachments_message ON message_attachments(message_id)",
+      "FOREIGN KEY (message_id) REFERENCES messages(id)",
+    ],
+  });
+
+  db.define("memories", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      message_id: "TEXT",
+      user_id: "TEXT",
+      summary: "TEXT NOT NULL",
+      contents: "TEXT NOT NULL",
+      tags: "TEXT NOT NULL DEFAULT '[]'",
+      category: "TEXT",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      deleted_at: "TEXT",
+    },
+    tableConstraints: [
+      "CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id, created_at)",
+      "CREATE INDEX IF NOT EXISTS idx_memories_message ON memories(message_id)",
+    ],
+  });
 }

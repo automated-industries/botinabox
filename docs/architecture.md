@@ -14,9 +14,11 @@ botinabox is a single npm package for building multi-agent bots. It uses a layer
              └──────────────────┬───────────────────────┘
                                 │
              ┌──────────────────▼───────────────────────┐
-             │          Message Pipeline                  │
-             │  Routing, policy evaluation, allowlists,  │
-             │  mention gates, user resolution            │
+             │          Chat Layer                        │
+             │  MessageStore — store before respond       │
+             │  ChatResponder — fast ack, LLM filter      │
+             │  MessageInterpreter — async extraction      │
+             │  TriageRouter — keyword/regex/LLM routing   │
              └──────────────────┬───────────────────────┘
                                 │
              ┌──────────────────▼───────────────────────┐
@@ -152,6 +154,10 @@ workflow.completed --> Your handler: notify stakeholders
 | `permission.requested` | `{ promptId, agentId, action }` | PermissionRelay |
 | `permission.responded` | `{ promptId, status, respondedBy }` | PermissionRelay |
 | `permission.expired` | `{ promptId, agentId }` | PermissionRelay |
+| `message.stored` | `{ messageId, direction, channel }` | MessageStore |
+| `response.ready` | `{ messageId, channel, threadId, text }` | ChatResponder |
+| `response.suppressed` | `{ channel, threadId, reason }` | ChatResponder |
+| `interpretation.completed` | `{ messageId, taskCount, memoryCount, isTaskRequest }` | MessageInterpreter |
 | `audit` | `{ table, action, ... }` | AuditEmitter |
 
 ## DataStore + LatticeSQL
@@ -217,6 +223,8 @@ await db.init({ migrations: [...] });
 | `feedback` | Structured execution feedback records |
 | `playbooks` | Generalized rules promoted from feedback |
 | `agent_playbooks` | Agent-playbook junction table |
+| `memories` | Structured memory storage (summary, contents, tags) |
+| `message_attachments` | File storage linked to messages |
 | `users` | User records (cross-channel identity) |
 | `user_identities` | Channel-specific user identities |
 | `schedules` | Cron and one-time schedule definitions |
