@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [1.8.0] — 2026-04-05
+
+### Added
+
+- **Chat pipeline** — `ChatPipeline` class provides a configurable 6-layer chat orchestration pipeline. Apps provide system prompt, routing rules, and LLM call function; the framework handles dedup, storage, fast ack, async interpretation, task dispatch, and completion response. Replaces ~400 lines of duplicated handler code per app with ~20 lines of config.
+- **`thread_task_map` core table** — Maps chat threads to tasks for response routing. Previously required per-app table definitions.
+- **`message_dedup` core table** — SHA256-based message deduplication with configurable time window. Previously required per-app table definitions.
+
+### Changed
+
+- Core table count: 25 → 27 (added `thread_task_map`, `message_dedup`).
+- `ChatPipeline` emits `interpretation.error` hook on interpretation failures (no longer swallowed silently).
+
 ## [1.7.0] — 2026-04-05
 
 ### Added

@@ -438,6 +438,32 @@ export function defineCoreTables(db: DataStore): void {
     ],
   });
 
+  db.define("thread_task_map", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      thread_ts: "TEXT NOT NULL",
+      channel_id: "TEXT NOT NULL",
+      task_id: "TEXT NOT NULL",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    },
+    tableConstraints: [
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_thread_task_map_thread ON thread_task_map(thread_ts, channel_id)",
+      "CREATE INDEX IF NOT EXISTS idx_thread_task_map_task ON thread_task_map(task_id)",
+    ],
+  });
+
+  db.define("message_dedup", {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      content_hash: "TEXT NOT NULL",
+      channel_id: "TEXT NOT NULL",
+      created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    },
+    tableConstraints: [
+      "CREATE INDEX IF NOT EXISTS idx_message_dedup_hash ON message_dedup(content_hash, created_at)",
+    ],
+  });
+
   db.define("memories", {
     columns: {
       id: "TEXT PRIMARY KEY",
