@@ -6,6 +6,8 @@ export { ChannelRegistry, ChannelRegistryError } from "./channel-registry.js";
 export { discoverChannels } from "./auto-discovery.js";
 export { MessagePipeline } from "./pipeline.js";
 export { buildAgentBindings } from "./routing.js";
+export { TriageRouter } from "./triage-router.js";
+export type { RoutingRule, RoutingDecision, TriageRouterConfig } from "./triage-router.js";
 export { checkAllowlist, checkMentionGate } from "./policies.js";
 export { SessionKey } from "./session-key.js";
 export { ChatSessionManager } from "./session-manager.js";

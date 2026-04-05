@@ -1,5 +1,6 @@
 import type { DataStore } from '../data/data-store.js';
 import type { HookBus } from '../hooks/hook-bus.js';
+import type { CircuitBreaker } from './circuit-breaker.js';
 import { checkChainDepth, MAX_CHAIN_DEPTH } from './chain-guard.js';
 import { interpolate } from './template-interpolate.js';
 
@@ -11,6 +12,7 @@ export class RunManager {
   private locks = new Map<string, string>(); // agentId → runId
   private orphanTimer: ReturnType<typeof setInterval> | null = null;
   private readonly staleThresholdMs: number;
+  private circuitBreaker?: CircuitBreaker;
 
   constructor(
     private db: DataStore,
@@ -18,6 +20,13 @@ export class RunManager {
     private config?: { staleThresholdMs?: number; maxBackoffMs?: number },
   ) {
     this.staleThresholdMs = config?.staleThresholdMs ?? DEFAULT_STALE_THRESHOLD_MS;
+  }
+
+  /**
+   * Attach a CircuitBreaker to prevent retries on broken agents.
+   */
+  setCircuitBreaker(cb: CircuitBreaker): void {
+    this.circuitBreaker = cb;
   }
 
   isLocked(agentId: string): boolean {
@@ -75,12 +84,21 @@ export class RunManager {
     const taskId = run['task_id'] as string;
 
     if (!succeeded) {
-      // Retry policy
+      // Record failure in circuit breaker (if attached)
+      if (this.circuitBreaker) {
+        await this.circuitBreaker.recordFailure(agentId, result.output);
+      }
+
+      // Retry policy — skip retry if circuit breaker is open
       const task = await this.db.get('tasks', { id: taskId });
       if (task) {
         const retryCount = (task['retry_count'] as number) ?? 0;
         const maxRetries = (task['max_retries'] as number) ?? 0;
-        if (retryCount < maxRetries) {
+        const circuitOpen = this.circuitBreaker
+          ? !this.circuitBreaker.canExecute(agentId)
+          : false;
+
+        if (retryCount < maxRetries && !circuitOpen) {
           // Exponential backoff: BASE_BACKOFF_MS * 2^retryCount
           const maxBackoff = this.config?.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
           const backoffMs = Math.min(BASE_BACKOFF_MS * Math.pow(2, retryCount), maxBackoff);
@@ -93,7 +111,7 @@ export class RunManager {
             updated_at: new Date().toISOString(),
           });
         } else {
-          // Retries exhausted — mark task as failed
+          // Retries exhausted or circuit open — mark task as failed
           await this.db.update('tasks', { id: taskId }, {
             status: 'failed',
             updated_at: new Date().toISOString(),
@@ -101,6 +119,10 @@ export class RunManager {
         }
       }
     } else {
+      // Record success in circuit breaker (if attached)
+      if (this.circuitBreaker) {
+        await this.circuitBreaker.recordSuccess(agentId);
+      }
       // Mark task done with result before emitting run.completed,
       // so hook handlers can read task.result immediately.
       await this.db.update('tasks', { id: taskId }, {

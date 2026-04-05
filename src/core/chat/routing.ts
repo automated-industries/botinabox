@@ -1,6 +1,10 @@
 /**
  * Chat routing — maps channel/scope to agentId.
  * Story 4.2
+ *
+ * @deprecated Use TriageRouter for content-aware routing with keyword/regex
+ * matching and LLM fallback. This static channel→agent binding is kept for
+ * backward compatibility only. See `./triage-router.ts`.
  */
 
 import type { AgentConfig } from "../../shared/index.js";
@@ -8,6 +12,9 @@ import type { AgentConfig } from "../../shared/index.js";
 /**
  * Build a map from channel identifier to agentId.
  * Each agent may have a config.channel or config.channels binding.
+ *
+ * @deprecated Use TriageRouter instead — it supports keyword, regex,
+ * and LLM-based routing with ownership chain logging.
  */
 export function buildAgentBindings(agents: AgentConfig[]): Map<string, string> {
   const bindings = new Map<string, string>();
