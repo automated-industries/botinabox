@@ -5,6 +5,8 @@ A modular TypeScript framework for building multi-agent bots with LLM orchestrat
 ## Features
 
 - **Multi-agent orchestration** -- Define agents with different models, roles, and execution adapters. Task queue with priority scheduling, retry policies, and followup chains.
+- **Chat response layer** -- Fast (<2s) conversational responses via cheap LLM. Rolling context window, LLM-filtered readability, redundancy suppression. Store-before-respond guarantee for all messages.
+- **Message interpretation** -- Async structured extraction from messages into tasks, memories, files, and user context. Pluggable extractors for custom data types.
 - **Two-tier agents** -- Deterministic adapter for tasks that don't need LLM reasoning (routing, validation, data fetching). API and CLI adapters for LLM-driven tasks.
 - **Triage routing** -- Content-aware message routing with keyword/regex matching, priority rules, and LLM fallback for ambiguous messages. Ownership chain logging for every routing decision.
 - **Loop detection and circuit breakers** -- Pattern-based loop detection (self-loops, ping-pong, blocked re-entry) plus circuit breakers with automatic human escalation when agents fail repeatedly.

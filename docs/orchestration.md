@@ -1207,6 +1207,88 @@ const response = await relay.requestApproval({
 await relay.approveLocally('perm-1', true);
 ```
 
+## 17. MessageStore
+
+Guarantees every message (inbound and outbound) is stored before any bot response. Attachments are stored linked to their parent message.
+
+```typescript
+import { MessageStore } from 'botinabox';
+
+const store = new MessageStore(db, hooks);
+
+// Store inbound message + attachments BEFORE responding
+const { messageId, attachmentIds } = await store.storeInbound(msg);
+
+// Store outbound message BEFORE sending
+const outboundId = await store.storeOutbound({
+  channel: 'slack',
+  text: 'Working on it!',
+  threadId: 'thread-1',
+  agentSlug: 'assistant',
+});
+
+// Query thread history for context building
+const history = await store.getThreadHistory('thread-1', 20);
+
+// Get recent outbound messages for redundancy checking
+const recent = await store.getRecentOutbound('thread-1', 10);
+```
+
+## 18. ChatResponder
+
+Fast conversational layer that provides <2s responses via a cheap LLM (Haiku). All outbound messages pass through this layer for human readability and redundancy suppression.
+
+```typescript
+import { ChatResponder } from 'botinabox';
+
+const responder = new ChatResponder(db, hooks, messageStore, {
+  llmCall,
+  model: 'fast',
+  contextWindowTokens: 4000,
+  redundancyWindow: 10,
+});
+
+// Fast conversational response with rolling context
+const reply = await responder.respond({
+  messageBody: 'deploy to staging',
+  threadId: 'thread-1',
+  channel: 'slack',
+  userName: 'Brian',
+  capabilities: 'engineering, QA, research',
+});
+
+// Full send pipeline: redundancy → filter → store → deliver
+const messageId = await responder.sendResponse({
+  text: agentOutput,
+  channel: 'slack',
+  threadId: 'thread-1',
+  source: 'agent',
+});
+// Returns undefined if suppressed as redundant
+```
+
+## 19. MessageInterpreter
+
+Async extraction of structured data from messages. Pluggable extractors for custom types.
+
+```typescript
+import { MessageInterpreter } from 'botinabox';
+
+const interpreter = new MessageInterpreter(db, hooks, {
+  llmCall,
+  model: 'fast',
+  extractors: [customProjectExtractor],
+});
+
+const result = await interpreter.interpret(messageId);
+// result.tasks — actionable requests
+// result.memories — notes, thoughts, information to remember
+// result.userContext — learned traits about the user
+// result.files — extracted attachment contents
+// result.custom — results from custom extractors
+// result.isTaskRequest — true if message contains tasks
+```
+
 ## Task Lifecycle: End-to-End
 
 Here is the complete lifecycle of a task from creation to completion:

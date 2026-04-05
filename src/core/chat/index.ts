@@ -12,6 +12,21 @@ export { checkAllowlist, checkMentionGate } from "./policies.js";
 export { SessionKey } from "./session-key.js";
 export { ChatSessionManager } from "./session-manager.js";
 export { NotificationQueue } from "./notification-queue.js";
+export { MessageStore } from "./message-store.js";
+export type { StoredAttachment, StoreResult } from "./message-store.js";
+export { ChatResponder } from "./chat-responder.js";
+export type { ChatResponderConfig } from "./chat-responder.js";
+export { MessageInterpreter } from "./message-interpreter.js";
+export type {
+  Extractor,
+  ExtractedTask,
+  ExtractedMemory,
+  ExtractedFile,
+  ExtractedUserContext,
+  InterpretationResult,
+  MessageInterpreterConfig,
+  LLMCallFn,
+} from "./message-interpreter.js";
 export { chunkText } from "./text-chunker.js";
 export { formatText } from "./formatter.js";
 export type {
