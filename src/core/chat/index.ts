@@ -27,6 +27,8 @@ export type {
   MessageInterpreterConfig,
   LLMCallFn,
 } from "./message-interpreter.js";
+export { ChatPipeline } from "./chat-pipeline.js";
+export type { ChatPipelineConfig } from "./chat-pipeline.js";
 export { chunkText } from "./text-chunker.js";
 export { formatText } from "./formatter.js";
 export type {
