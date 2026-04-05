@@ -90,7 +90,7 @@ export function defineCoreEntityContexts(db: DataStore): void {
   db.defineEntityContext("users", {
     table: "users",
     directory: "users",
-    slugColumn: "name",
+    slugColumn: "id",
     protected: true,
     indexFile: "users/USERS.md",
     files: {
