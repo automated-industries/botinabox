@@ -250,10 +250,12 @@ export class ChatPipelineV2 {
         void this.extractAsync(messageId);
       } catch (err) {
         await this.hooks.emit('typing.stop', { channel: this.channel, threadId: threadTs });
-        // LLM failure is non-fatal — message was stored, just no response
+        const errMsg = err instanceof Error ? err.message : String(err);
+        // Always log — pipeline errors must never be silent
+        console.error('[ChatPipelineV2] Pipeline error:', errMsg);
         await this.hooks.emit('pipeline.error', {
           messageId,
-          error: err instanceof Error ? err.message : String(err),
+          error: errMsg,
         });
       }
     });

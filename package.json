@@ -1,6 +1,6 @@
 {
   "name": "botinabox",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Bot in a Box — framework for building multi-agent bots",
   "type": "module",
   "main": "./dist/index.js",
