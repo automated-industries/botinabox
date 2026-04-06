@@ -223,7 +223,9 @@ export class MessageInterpreter {
         maxTokens: 1000,
       });
 
-      const parsed = JSON.parse(result.content) as {
+      // Strip markdown fences if present (LLMs often wrap JSON in ```json...```)
+      const raw = result.content.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+      const parsed = JSON.parse(raw) as {
         tasks?: Array<{ title: string; description?: string; priority?: number }>;
         memories?: Array<{ summary: string; contents: string; tags?: string[]; category?: string }>;
         user_context?: Array<{ trait: string; value: string }>;
