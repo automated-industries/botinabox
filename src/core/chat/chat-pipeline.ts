@@ -197,7 +197,7 @@ export class ChatPipeline {
       void dispatchPromise;
     });
 
-    // Layer 6: Task execution response
+    // Layer 6: Task execution response + file attachments
     this.hooks.register('run.completed', async (ctx) => {
       const taskId = ctx.taskId as string;
       if (!taskId) return;
@@ -212,15 +212,44 @@ export class ChatPipeline {
       if (mappings.length === 0) return;
 
       const mapping = mappings[0]!;
+      const threadId = mapping.thread_ts as string;
+
+      // Send text response
       await this.responder.sendResponse({
         text: output,
         channel: this.channel,
-        threadId: mapping.thread_ts as string,
+        threadId,
         agentId: ctx.agentId as string,
         taskId,
         source: 'agent',
-        skipRedundancyCheck: true, // Task results are always delivered
+        skipRedundancyCheck: true,
       });
+
+      // Check if the original message requested a file — look up in DB and emit attachment
+      const taskDesc = (task?.description as string) ?? '';
+      try {
+        const files = await this.db.query('file');
+        for (const file of files) {
+          const fileName = (file.name as string ?? '').toLowerCase();
+          const descLower = taskDesc.toLowerCase();
+          if (fileName && descLower.includes(fileName.split(' ')[0]!.toLowerCase()) &&
+              descLower.includes(fileName.split(' ').pop()!.toLowerCase())) {
+            // Fuzzy match — file name words appear in task description
+            const filePath = file.file_path as string;
+            if (filePath) {
+              await this.hooks.emit('file.deliver', {
+                filePath,
+                fileName: file.name,
+                channel: this.channel,
+                threadId,
+                taskId,
+              });
+            }
+          }
+        }
+      } catch {
+        // File lookup is best-effort
+      }
     }, { priority: 90 });
   }
 
@@ -336,11 +365,22 @@ export class ChatPipeline {
 
     const taskId = randomUUID();
     if (threadTs) {
-      await this.db.insert('thread_task_map', {
-        thread_ts: threadTs,
-        channel_id: channelId,
-        task_id: taskId,
+      // Upsert: update existing mapping if thread already mapped (task was done),
+      // otherwise insert new mapping
+      const existingMap = await this.db.query('thread_task_map', {
+        where: { thread_ts: threadTs, channel_id: channelId },
       });
+      if (existingMap.length > 0) {
+        await this.db.update('thread_task_map', { id: existingMap[0]!.id }, {
+          task_id: taskId,
+        });
+      } else {
+        await this.db.insert('thread_task_map', {
+          thread_ts: threadTs,
+          channel_id: channelId,
+          task_id: taskId,
+        });
+      }
     }
 
     await this.tasks.create({

@@ -12,4 +12,6 @@ export type { TranscribeOptions, TranscribeResult } from "./transcribe.js";
 export { formatForSlack } from "./outbound.js";
 export type { SlackConfig } from "./models.js";
 
+export { SlackBoltAdapter } from "./bolt-adapter.js";
+export type { SlackBoltAdapterConfig } from "./bolt-adapter.js";
 export { default } from "./adapter.js";

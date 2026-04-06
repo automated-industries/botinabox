@@ -13,3 +13,5 @@ export type {
   ToolDefinition,
   ToolUse,
 } from "./types.js";
+export { createDefaultLLMCall } from "./default-llm-call.js";
+export type { DefaultLLMCallConfig } from "./default-llm-call.js";
