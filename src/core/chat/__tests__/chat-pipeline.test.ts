@@ -264,6 +264,66 @@ describe('ChatPipeline — Story 7.4', () => {
     });
   });
 
+  describe('Layer 6: Task execution response', () => {
+    it('regression: agent output is sent with skipFilter=true to prevent meta-commentary', async () => {
+      // Bug: filterResponse returned "That's already pretty conversational!"
+      // because agent output was being rewritten by the LLM filter.
+      // Agent output should bypass the filter entirely.
+      let filterCalled = false;
+      const trackFilterLlm = async (params: { messages: Array<{ content: string }> }) => {
+        const content = params.messages[params.messages.length - 1]?.content ?? '';
+        if (content.includes('Rewrite this agent/system message')) {
+          filterCalled = true;
+        }
+        if (content.includes('duplicate or substantially overlap')) {
+          return { content: 'not redundant' };
+        }
+        return { content: 'Got it!' };
+      };
+
+      const pipeline = new ChatPipeline(db, hooks, {
+        llmCall: trackFilterLlm,
+        systemPrompt: 'Test',
+        routingRules: [],
+        fallbackAgent: 'engineer',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      // Simulate: send a message to create a task and thread mapping
+      const msg = makeMessage('do something', { account: 'C_TEST' });
+      await hooks.emit('message.inbound', msg as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // Find the task that was created
+      const allTasks = await db.query('tasks');
+      expect(allTasks.length).toBeGreaterThanOrEqual(1);
+      const task = allTasks[0]!;
+      const taskId = task.id as string;
+
+      // Simulate task completion with result
+      await db.update('tasks', { id: taskId }, {
+        status: 'done',
+        result: 'Here is a long agent output that is over 100 chars. '.repeat(3),
+      });
+
+      // Reset filter tracking
+      filterCalled = false;
+
+      // Emit run.completed to trigger Layer 6
+      await hooks.emit('run.completed', {
+        runId: 'run-1',
+        agentId: task.assignee_id as string,
+        taskId,
+        status: 'succeeded',
+        exitCode: 0,
+      });
+
+      // The filterResponse LLM call should NOT have been invoked for agent output
+      expect(filterCalled).toBe(false);
+    });
+  });
+
   describe('resilience', () => {
     it('does not crash when LLM call fails during interpretation', async () => {
       let callCount = 0;

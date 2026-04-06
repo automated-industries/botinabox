@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.3.2] — 2026-04-06
+
+### Fixed
+
+- **Agent output bypasses LLM filter** — Layer 6 (task execution response) now sends agent output with `skipFilter: true`. Previously, agent output was passed through `filterResponse()` which sometimes added meta-commentary like "That's already pretty conversational!" instead of returning the original text.
+- **filterResponse prompt hardened** — The LLM rewrite prompt now explicitly forbids meta-commentary about the text, preventing responses like "No rewrite needed" from being sent to users.
+- **Ack layer context excludes bot messages** — `ChatResponder.buildContextWindow()` now only includes inbound (user) messages. Previously, verbose prior bot responses were fed back into the ack LLM, causing it to mimic the verbosity and hallucinate system state and actions it cannot perform.
+
 ## [2.3.1] — 2026-04-06
 
 ### Fixed

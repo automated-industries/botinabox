@@ -213,7 +213,9 @@ export class ChatPipeline {
       const mapping = mappings[0]!;
       const threadId = mapping.thread_ts as string;
 
-      // Send text response
+      // Send text response — skip filter for agent output to prevent
+      // the LLM rewriter from adding meta-commentary like
+      // "That's already pretty conversational!"
       await this.responder.sendResponse({
         text: output,
         channel: this.channel,
@@ -222,6 +224,7 @@ export class ChatPipeline {
         taskId,
         source: 'agent',
         skipRedundancyCheck: true,
+        skipFilter: true,
       });
 
       // Check if the original message requested a file — look up in DB and emit attachment
