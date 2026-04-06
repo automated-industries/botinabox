@@ -149,6 +149,17 @@ export class MessageStore {
   }
 
   /**
+   * Get recent messages from a specific user across all threads.
+   */
+  async getUserHistory(userId: string, channel: string, limit = 50): Promise<Array<Record<string, unknown>>> {
+    return this.db.query('messages', {
+      where: { from_user: userId, channel },
+      orderBy: 'created_at',
+      limit,
+    });
+  }
+
+  /**
    * Get attachments for a message.
    */
   async getAttachments(messageId: string): Promise<Array<Record<string, unknown>>> {
