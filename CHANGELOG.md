@@ -6,6 +6,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.3.0] — 2026-04-06
+
+### Fixed
+
+- **Task execution retry** — ExecutionEngine now registers `agent.wakeup` handler so poll-discovered tasks actually execute. Previously, tasks stuck in 'todo' when the assigned agent was locked at creation time because only `task.created` was handled and `agent.wakeup` was emitted but never consumed.
+- **Immediate task pickup after run completes** — New `run.completed` handler checks for pending tasks on the freed agent, eliminating up to 30s poll delay between sequential tasks.
+- **Retry backoff respected** — `tryExecuteTask` checks `next_retry_at` before executing, preventing premature retries.
+- **Race condition guard** — `startRun` failure (agent locked between check and start) is caught gracefully instead of propagating.
+
+### Changed
+
+- **Suppress interpretation noise** — ChatPipeline no longer sends "Noted X things to remember" messages. Memories are still stored by the interpreter; the user just doesn't get a separate notification message for each one. Reduces messages-per-input from 2-3 to 1-2.
+
+### Added
+
+- **`nativeTools` export** — All 20 built-in tools bundled in a single array. Apps can now use `tools: nativeTools` instead of enumerating each tool individually.
+
 ## [2.2.1] — 2026-04-06
 
 ### Changed

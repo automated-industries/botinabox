@@ -296,25 +296,8 @@ export class ChatPipeline {
     try {
       const result = await this.interpreter.interpret(messageId);
 
-      // Store any extracted memories (enrichment only — task already created above)
-      if (result.memories.length > 0 || result.userContext.length > 0) {
-        try {
-          const parts: string[] = [];
-          if (result.memories.length > 0) {
-            parts.push(`Noted ${result.memories.length} thing${result.memories.length > 1 ? 's' : ''} to remember.`);
-          }
-          if (parts.length > 0) {
-            await this.responder.sendResponse({
-              text: parts.join(' '),
-              channel: this.channel,
-              threadId: threadTs,
-              source: 'interpretation',
-            });
-          }
-        } catch {
-          // Non-fatal
-        }
-      }
+      // Memories are stored by the interpreter — no notification needed.
+      // Sending "Noted X things" was noise that caused extra messages per input.
     } catch (err) {
       // Interpretation failure is non-fatal — task was already created above
       const errMsg = err instanceof Error ? err.message : String(err);
