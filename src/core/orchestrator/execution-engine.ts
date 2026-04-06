@@ -94,9 +94,15 @@ export async function registerExecutionEngine(opts: {
     const prompt = (task.description as string) ?? (task.title as string) ?? '';
 
     try {
+      // Auto-generate tool listing from registered tool definitions
+      const toolListing = toolDefs.length > 0
+        ? `\n## Available Tools\n${toolDefs.map(t => `- **${t.name}**: ${t.description}`).join('\n')}\n\nUse your tools to take action. Do NOT describe what you would do — call the tool.`
+        : '';
+
       const systemPrompt = [
         `You are ${agent.name}, an AI agent with role: ${agent.role}.`,
         systemContext ? `\n${systemContext}` : '',
+        toolListing,
         config.systemPromptSuffix ?? '',
       ].filter(Boolean).join('\n');
 
