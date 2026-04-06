@@ -382,8 +382,8 @@ export class ChatPipelineV2 {
 
             toolResults.push({
               type: 'tool_result',
-              id: toolUse.id!,
-              text: result,
+              tool_use_id: toolUse.id!,
+              content: result,
             } as unknown as ContentBlock);
           } catch (err) {
             toolResults.push({
@@ -437,9 +437,34 @@ export class ChatPipelineV2 {
     let charCount = 0;
 
     for (const row of rows) {
-      const body = (row.body as string) ?? '';
-      const direction = row.direction as string;
+      const rawBody = row.body as string | undefined;
+      if (!rawBody) continue;
 
+      // Ensure body is a plain string — old messages may have stored JSON
+      // or structured content that would break the Anthropic API.
+      let body: string;
+      if (rawBody.startsWith('[') || rawBody.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rawBody);
+          // If it's an array of content blocks, extract text
+          if (Array.isArray(parsed)) {
+            body = parsed
+              .filter((b: Record<string, unknown>) => b.type === 'text')
+              .map((b: Record<string, unknown>) => b.text ?? '')
+              .join('');
+          } else {
+            body = rawBody;
+          }
+        } catch {
+          body = rawBody;
+        }
+      } else {
+        body = rawBody;
+      }
+
+      if (!body) continue;
+
+      const direction = row.direction as string;
       if (!includeAssistant && direction !== 'inbound') continue;
       if (charCount + body.length > maxChars) break;
 
