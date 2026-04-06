@@ -6,6 +6,91 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.1.1] — 2026-04-06
+
+### Fixed
+
+- **Config auto-initialization** — `getConfig()` no longer throws when called before `loadConfig()`. Auto-initializes with defaults. Prevents crashes on Railway when YAML config file is missing from the Docker container.
+
+### Added
+
+- Regression test: "getConfig never crashes even without prior loadConfig/initConfig"
+
+## [2.1.0] — 2026-04-06
+
+### Added
+
+- **Unified config types** — `BotConfig` now includes `ExecutionConfig`, `ChatConfig`, `RoutingConfig`, `SafetyConfig`. All settings in one `botinabox.config.yml` file.
+
+## [2.0.1] — 2026-04-06
+
+### Fixed
+
+- **Auto-generated tool listing** — ExecutionEngine system prompt auto-lists registered tools from their definitions. No manual prompt engineering needed.
+
+## [2.0.0] — 2026-04-06
+
+### Added
+
+- **22 built-in tools across 6 modules** — file ops (send, read, list, register), task ops (dispatch, cancel, reassign), status (task, agent, system, active tasks), roster (list agents, list projects, agent detail), messaging (send message, task comment, read conversation, search conversation), management (create agent, create project). All channel-agnostic. All with LLM-friendly descriptions.
+- **`ToolContext`** — tools receive `db`, `hooks`, `resolveFilePath` in their context.
+- Recovered 16 lost tools from internal refactor.
+
+## [1.9.3] — 2026-04-05
+
+### Fixed
+
+- **Channel-based context** — ChatResponder uses `getChannelHistory()` (all messages in DM) instead of `getThreadHistory()` (single thread). Thread IDs in DMs are unreliable.
+
+## [1.9.2] — 2026-04-05
+
+### Fixed
+
+- **DM thread stability** — Always use channel ID as thread anchor. Slack auto-threads fragment context.
+
+## [1.9.1] — 2026-04-05
+
+### Fixed
+
+- **latticesql 1.3.1** — EXDEV cross-device rename fix for Docker volume mounts.
+
+## [1.9.0] — 2026-04-05
+
+### Added
+
+- **ExecutionEngine** — generic task executor with pluggable tools and tool loop.
+- **SlackBoltAdapter** — real Bolt Socket Mode with auto-registered response/file hooks.
+- **`buildSystemContext()`** — shared utility for LLM system prompts.
+- **`createDefaultLLMCall()`** — ready-to-use Anthropic SDK wrapper.
+
+## [1.8.5] — 2026-04-05
+
+### Fixed
+
+- **DM conversation context** — use channel ID as stable thread_id for non-threaded DMs.
+
+## [1.8.4] — 2026-04-05
+
+### Fixed
+
+- **Programmatic task creation** — every message creates a task by code, not LLM dependent.
+- **JSON markdown fence stripping** — Haiku wraps JSON in fences; strip before parse.
+- **Task result delivery** — skip redundancy check on task results.
+
+## [1.8.3] — 2026-04-05
+
+### Fixed
+
+- **Always create tasks** — default to action, execution layer decides.
+- **Resilience tests** — LLM failure, invalid JSON, redundancy crash tests.
+
+## [1.8.2] — 2026-04-05
+
+### Added
+
+- **additionalContext** — ChatResponder accepts user history for context.
+- **getUserHistory()** — MessageStore queries by user + channel.
+
 ## [1.8.1] — 2026-04-05
 
 ### Fixed
