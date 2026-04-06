@@ -142,10 +142,13 @@ export class ChatPipeline {
       // Dedup check
       if (await this.isDuplicate(msg)) return;
 
-      // Resolve thread ID (prefer threadId, fall back to raw ts)
+      // Resolve thread ID:
+      // - If in a Slack thread: use threadId (the parent message ts)
+      // - If in a DM (no thread): use the channel ID as a stable "thread"
+      //   so all messages in the same DM share context
       const rawTs = (msg.raw as Record<string, unknown> | undefined)?.ts as string | undefined;
-      const threadTs = msg.threadId ?? rawTs ?? msg.id;
       const channelId = msg.account ?? '';
+      const threadTs = msg.threadId ?? channelId ?? rawTs ?? msg.id;
 
       // Track thread → channel for response routing
       if (threadTs && channelId) {
@@ -153,7 +156,9 @@ export class ChatPipeline {
       }
 
       // ── Layer 1: Storage ───────────────────────────────────────
-      const { messageId } = await this.messageStore.storeInbound(msg);
+      // Set threadId on message so all messages in the same DM share a thread
+      const msgWithThread = { ...msg, threadId: threadTs };
+      const { messageId } = await this.messageStore.storeInbound(msgWithThread);
 
       // ── Layer 2: Fast Response ─────────────────────────────────
       // Include recent user message history for channel-wide context

@@ -353,6 +353,33 @@ describe('ChatPipeline — Story 7.4', () => {
       expect(inbound.length).toBeGreaterThanOrEqual(1);
     });
 
+    it('stores inbound messages with consistent thread_id for DM context', async () => {
+      new ChatPipeline(db, hooks, {
+        llmCall: mockLlmCall(),
+        systemPrompt: 'Test',
+        routingRules: [],
+        fallbackAgent: 'engineer',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      // Two messages in same DM (same account/channel, no threadId)
+      const msg1 = makeMessage('first message', { threadId: undefined, account: 'D_CHANNEL' });
+      const msg2 = makeMessage('second message', { threadId: undefined, account: 'D_CHANNEL' });
+
+      await hooks.emit('message.inbound', msg1 as unknown as Record<string, unknown>);
+      await waitForAsync();
+      await hooks.emit('message.inbound', msg2 as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // Both messages should share the same thread_id (the channel ID)
+      const stored = await db.query('messages', { where: { direction: 'inbound' } });
+      const threadIds = stored.map(m => m.thread_id).filter(Boolean);
+      const unique = new Set(threadIds);
+      expect(unique.size).toBe(1); // All share same thread
+      expect(threadIds[0]).toBe('D_CHANNEL');
+    });
+
     it('creates a task for EVERY message (default to action)', async () => {
       new ChatPipeline(db, hooks, {
         llmCall: mockLlmCall(),
