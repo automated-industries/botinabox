@@ -86,6 +86,26 @@ describe('ChatResponder — Story 7.2', () => {
       const result = await responder.filterResponse(longText);
       expect(result).toBe('Cleaned up response');
     });
+
+    it('regression: prompt instructs LLM to never add meta-commentary about the text', async () => {
+      // Bug: LLM returned "That's already pretty conversational!" instead of original text.
+      // The prompt must explicitly forbid meta-commentary.
+      let capturedPrompt = '';
+      const captureLlm = async (params: { messages: Array<{ content: string }> }) => {
+        capturedPrompt = params.messages[0]?.content ?? '';
+        return { content: 'filtered' };
+      };
+
+      const responder = new ChatResponder(db, hooks, messageStore, {
+        llmCall: captureLlm,
+      });
+
+      await responder.filterResponse('a'.repeat(200));
+
+      // The prompt must explicitly forbid meta-commentary
+      expect(capturedPrompt).toMatch(/never|do not|must not/i);
+      expect(capturedPrompt).toMatch(/comment/i);
+    });
   });
 
   describe('isRedundant', () => {

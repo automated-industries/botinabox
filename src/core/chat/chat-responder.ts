@@ -127,7 +127,7 @@ export class ChatResponder {
       messages: [
         {
           role: 'user',
-          content: `Rewrite this agent/system message to be human-friendly and conversational. Keep the substance, remove jargon, make it feel like a helpful assistant talking to a person. If it's already readable, return it as-is. Do not add preamble like "Here's the rewritten version". Just output the rewritten text.\n\n---\n${text}`,
+          content: `Rewrite this agent/system message to be human-friendly and conversational. Keep the substance, remove jargon, make it feel like a helpful assistant talking to a person. If it's already readable, output the original text verbatim. CRITICAL: Never add meta-commentary about the text (e.g. "That's already conversational", "No rewrite needed", "Here's the rewritten version"). Output ONLY the final message text, nothing else.\n\n---\n${text}`,
         },
       ],
       maxTokens: 1000,
@@ -226,6 +226,10 @@ export class ChatResponder {
 
   /**
    * Build a context window from thread history, trimmed to token limit.
+   *
+   * Only includes inbound (user) messages. Outbound (bot) messages are
+   * excluded to prevent the ack layer from mimicking prior verbose responses,
+   * which caused hallucinated system state and walls of text.
    */
   private buildContextWindow(
     history: Array<Record<string, unknown>>,
@@ -236,16 +240,21 @@ export class ChatResponder {
 
     const messages: ChatMessage[] = [];
 
-    // Walk backwards through history, adding messages until we hit the limit
+    // Walk backwards through history, adding only USER messages.
+    // Bot messages are excluded — they taught the ack LLM to be verbose
+    // and hallucinate system actions it cannot perform.
     for (let i = history.length - 1; i >= 0; i--) {
       const msg = history[i]!;
       const body = (msg['body'] as string) ?? '';
       const direction = msg['direction'] as string;
 
+      // Skip outbound (bot) messages — only include user messages for context
+      if (direction !== 'inbound') continue;
+
       if (charCount + body.length > maxChars) break;
 
       messages.unshift({
-        role: direction === 'inbound' ? 'user' : 'assistant',
+        role: 'user',
         content: body,
       });
       charCount += body.length;
