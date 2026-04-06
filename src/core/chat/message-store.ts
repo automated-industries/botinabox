@@ -149,6 +149,18 @@ export class MessageStore {
   }
 
   /**
+   * Get recent messages in a channel (all threads combined).
+   * More reliable than getThreadHistory for DMs where thread_ids are inconsistent.
+   */
+  async getChannelHistory(channel: string, limit = 50): Promise<Array<Record<string, unknown>>> {
+    return this.db.query('messages', {
+      where: { channel },
+      orderBy: 'created_at',
+      limit,
+    });
+  }
+
+  /**
    * Get recent messages from a specific user across all threads.
    */
   async getUserHistory(userId: string, channel: string, limit = 50): Promise<Array<Record<string, unknown>>> {
