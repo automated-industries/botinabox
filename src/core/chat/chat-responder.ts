@@ -80,10 +80,10 @@ export class ChatResponder {
     capabilities?: string;
     additionalContext?: string;
   }): Promise<string> {
-    // Build context window from thread history
-    const history = await this.messageStore.getThreadHistory(
-      opts.threadId,
-      50, // get more, trim by tokens
+    // Build context window from channel history (not thread — DM thread_ids are unreliable)
+    const history = await this.messageStore.getChannelHistory(
+      opts.channel,
+      50,
     );
 
     const messages = this.buildContextWindow(history, opts.messageBody);
