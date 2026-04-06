@@ -90,11 +90,10 @@ Return a JSON object with these fields:
 }
 
 Rules:
-- "tasks": actionable requests the user wants done. NOT conversational messages.
+- "tasks": ALWAYS create at least one task from every message. The task title should capture the user's intent. If the message is just a greeting or acknowledgment, create a task with title "Respond to greeting" or similar. Tasks are cheap — the execution layer decides whether action is needed.
 - "memories": information, notes, random thoughts to remember. Parse thematically — one message can have multiple memories.
 - "user_context": personality traits, preferences, or learnings about the user.
-- "is_task_request": true if the message contains at least one actionable task.
-- If the message is just a greeting or conversation, return empty arrays and is_task_request: false.
+- "is_task_request": ALWAYS true. Every message gets a task. The execution layer handles triage.
 - Return ONLY valid JSON, no markdown or explanation.`;
 
 export class MessageInterpreter {

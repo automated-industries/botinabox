@@ -81,6 +81,9 @@ export class ChatPipeline {
   // (before thread_task_map exists)
   private readonly threadChannelMap = new Map<string, string>();
 
+  /** Last dispatch promise — exposed for testing. */
+  lastDispatch: Promise<void> = Promise.resolve();
+
   constructor(
     private db: DataStore,
     private hooks: HookBus,
@@ -182,7 +185,10 @@ export class ChatPipeline {
       });
 
       // ── Layer 3-5: Async interpretation + dispatch ─────────────
-      void this.interpretAndDispatch(messageId, msg, threadTs, channelId);
+      // Dispatch async but track the promise for testability
+      const dispatchPromise = this.interpretAndDispatch(messageId, msg, threadTs, channelId);
+      this.lastDispatch = dispatchPromise;
+      void dispatchPromise;
     });
 
     // Layer 6: Task execution response
@@ -247,27 +253,31 @@ export class ChatPipeline {
   ): Promise<void> {
     try {
       const result = await this.interpreter.interpret(messageId);
-
       // Layer 4: Post-Interpretation Response
       if (result.tasks.length > 0 || result.memories.length > 0) {
-        const summary = this.buildSummary(result);
-        await this.responder.sendResponse({
-          text: summary,
-          channel: this.channel,
-          threadId: threadTs,
-          source: 'interpretation',
-        });
+        try {
+          const summary = this.buildSummary(result);
+          await this.responder.sendResponse({
+            text: summary,
+            channel: this.channel,
+            threadId: threadTs,
+            source: 'interpretation',
+          });
+        } catch {
+          // Summary send failure is non-fatal — proceed to dispatch
+        }
       }
 
-      // Layer 5: Task Dispatch
-      if (result.isTaskRequest && result.tasks.length > 0) {
+      // Layer 5: Task Dispatch — always dispatch, execution layer decides if action needed
+      if (result.tasks.length > 0) {
         await this.dispatchTasks(result, msg, threadTs, channelId);
       }
     } catch (err) {
       // Interpretation failure is non-fatal — ack was already sent
+      const errMsg = err instanceof Error ? err.message : String(err);
       await this.hooks.emit('interpretation.error', {
         messageId,
-        error: err instanceof Error ? err.message : String(err),
+        error: errMsg,
       });
     }
   }

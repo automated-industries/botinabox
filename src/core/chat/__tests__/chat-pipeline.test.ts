@@ -24,16 +24,15 @@ function mockLlmCall(response?: string) {
       const match = userContent.match(/---\n(.+)$/s);
       return { content: match?.[1] ?? userContent };
     }
-    // Interpretation
+    // Interpretation — always create a task (default to action)
     if (system.includes('message parser')) {
       const lower = userContent.toLowerCase();
-      const isTask = lower.includes('fix') || lower.includes('deploy') || lower.includes('build');
       return {
         content: JSON.stringify({
-          tasks: isTask ? [{ title: userContent.slice(0, 80), priority: 5 }] : [],
+          tasks: [{ title: userContent.slice(0, 80), priority: 5 }],
           memories: lower.includes('remember') ? [{ summary: 'Note', contents: userContent }] : [],
           user_context: [],
-          is_task_request: isTask,
+          is_task_request: true,
         }),
       };
     }
@@ -184,7 +183,7 @@ describe('ChatPipeline — Story 7.4', () => {
       expect(memories.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('does not create tasks for conversational messages', async () => {
+    it('creates tasks even for conversational messages (default to action)', async () => {
       new ChatPipeline(db, hooks, {
         llmCall: mockLlmCall(),
         systemPrompt: 'Test',
@@ -198,7 +197,7 @@ describe('ChatPipeline — Story 7.4', () => {
       await waitForAsync();
 
       const allTasks = await db.query('tasks');
-      expect(allTasks).toHaveLength(0);
+      expect(allTasks.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -257,6 +256,119 @@ describe('ChatPipeline — Story 7.4', () => {
 
       const mappings = await db.query('thread_task_map');
       expect(mappings.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('resilience', () => {
+    it('does not crash when LLM call fails during interpretation', async () => {
+      let callCount = 0;
+      const failingLlm = async (params: { system?: string; messages: Array<{ content: string }> }) => {
+        callCount++;
+        const system = params.system ?? '';
+        const userContent = params.messages[params.messages.length - 1]?.content ?? '';
+        // Redundancy check passes
+        if (userContent.includes('duplicate or substantially overlap')) return { content: 'not redundant' };
+        // Ack response works fine
+        if (!system.includes('message parser')) return { content: 'Got it!' };
+        // Interpretation LLM call throws
+        throw new Error('LLM API timeout');
+      };
+
+      const errors: string[] = [];
+      hooks.register('interpretation.error', (ctx) => {
+        errors.push(ctx.error as string);
+      });
+
+      new ChatPipeline(db, hooks, {
+        llmCall: failingLlm,
+        systemPrompt: 'Test',
+        routingRules: [],
+        fallbackAgent: 'engineer',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      // Should NOT throw — ack is sent, interpretation fails silently
+      await hooks.emit('message.inbound', makeMessage('do something') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // Ack was still sent
+      const outbound = await db.query('messages', { where: { direction: 'outbound' } });
+      expect(outbound.length).toBeGreaterThanOrEqual(1);
+
+      // Interpreter catches LLM errors internally and returns empty results.
+      // The pipeline does NOT crash — that's the critical assertion.
+      // The ack response above proves the process survived.
+    });
+
+    it('does not crash when LLM returns invalid JSON during interpretation', async () => {
+      const badJsonLlm = async (params: { system?: string }) => {
+        const system = params.system ?? '';
+        if (system.includes('message parser')) return { content: 'not valid json at all {{{}' };
+        return { content: 'Got it!' };
+      };
+
+      new ChatPipeline(db, hooks, {
+        llmCall: badJsonLlm,
+        systemPrompt: 'Test',
+        routingRules: [],
+        fallbackAgent: 'engineer',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      // Should NOT throw
+      await hooks.emit('message.inbound', makeMessage('hello') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // Ack was still sent
+      const outbound = await db.query('messages', { where: { direction: 'outbound' } });
+      expect(outbound.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('does not crash when redundancy check fails', async () => {
+      let callCount = 0;
+      const failOnRedundancy = async (params: { messages: Array<{ content: string }> }) => {
+        callCount++;
+        const content = params.messages[params.messages.length - 1]?.content ?? '';
+        if (content.includes('duplicate or substantially overlap')) throw new Error('Redundancy check crashed');
+        return { content: 'Got it!' };
+      };
+
+      new ChatPipeline(db, hooks, {
+        llmCall: failOnRedundancy,
+        systemPrompt: 'Test',
+        routingRules: [],
+        fallbackAgent: 'engineer',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      // Should NOT throw even if redundancy check fails
+      await hooks.emit('message.inbound', makeMessage('test message') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // Message was stored
+      const inbound = await db.query('messages', { where: { direction: 'inbound' } });
+      expect(inbound.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('creates a task for EVERY message (default to action)', async () => {
+      new ChatPipeline(db, hooks, {
+        llmCall: mockLlmCall(),
+        systemPrompt: 'Test',
+        routingRules: [],
+        fallbackAgent: 'engineer',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      // Even a greeting should produce a task
+      await hooks.emit('message.inbound', makeMessage('hello how are you') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      const allTasks = await db.query('tasks');
+      expect(allTasks.length).toBeGreaterThanOrEqual(1);
     });
   });
 });
