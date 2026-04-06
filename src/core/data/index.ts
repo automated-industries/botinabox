@@ -5,3 +5,4 @@ export * from './core-migrations.js';
 export * from './core-entity-contexts.js';
 export * from './domain-schema.js';
 export * from './domain-entity-contexts.js';
+export * from './context-builder.js';
