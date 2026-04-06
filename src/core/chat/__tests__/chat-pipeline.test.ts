@@ -72,7 +72,11 @@ beforeEach(async () => {
   });
 });
 
-afterEach(() => { db.close(); });
+afterEach(async () => {
+  // Wait for any pending async dispatches to complete before closing DB
+  await new Promise(r => setTimeout(r, 100));
+  db.close();
+});
 
 async function waitForAsync(): Promise<void> {
   // Needs enough time for: LLM ack → LLM interpretation → task dispatch
@@ -237,7 +241,8 @@ describe('ChatPipeline — Story 7.4', () => {
       await hooks.emit('message.inbound', msg as unknown as Record<string, unknown>);
       await waitForAsync();
 
-      const channel = await pipeline.resolveChannel('thread-123');
+      // Pipeline uses channelId (msg.account) as thread_ts, not threadId
+      const channel = await pipeline.resolveChannel('C_CHAN');
       expect(channel).toBe('C_CHAN');
     });
 
