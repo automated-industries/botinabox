@@ -4,26 +4,28 @@ A modular TypeScript framework for building multi-agent bots with LLM orchestrat
 
 ## Features
 
+- **Execution engine** -- Generic task executor with 22 built-in tools and a tool loop (up to 5 iterations). Agents can read files, send documents, dispatch tasks, search conversations, and more. Apps register tools declaratively.
+- **22 built-in tools** -- File ops (send, read, list, register), task ops (dispatch, cancel, reassign), system status (task, agent, system, active tasks), entity lookup (agents, projects, agent detail), messaging (send message, task comment, read/search conversation), management (create agent, create project). All channel-agnostic.
+- **Chat pipeline** -- Configurable 6-layer chat orchestration: dedup, storage, fast ack (<2s via Haiku), async interpretation, task dispatch, and completion response. Apps provide system prompt and routing rules; framework handles everything else.
+- **Slack integration** -- `SlackBoltAdapter` handles Bolt Socket Mode, message parsing, response delivery, and file uploads. One import, one `start()` call.
+- **Unified config** -- All settings in one `botinabox.config.yml`: models, execution, chat, routing, safety, budget. YAML with env var interpolation. Auto-initializes with sensible defaults.
+- **Message store** -- Store-before-respond guarantee. Inbound messages and attachments stored before any bot response. Channel history for conversation context.
+- **Message interpretation** -- Async structured extraction from messages into tasks, memories, files, and user context. Pluggable extractors for custom data types. Programmatic task creation (no LLM dependency).
+- **Triage routing** -- Content-aware message routing with keyword/regex matching, priority rules, and LLM fallback. Ownership chain logging for every routing decision.
 - **Multi-agent orchestration** -- Define agents with different models, roles, and execution adapters. Task queue with priority scheduling, retry policies, and followup chains.
-- **Chat response layer** -- Fast (<2s) conversational responses via cheap LLM. Rolling context window, LLM-filtered readability, redundancy suppression. Store-before-respond guarantee for all messages.
-- **Message interpretation** -- Async structured extraction from messages into tasks, memories, files, and user context. Pluggable extractors for custom data types.
-- **Two-tier agents** -- Deterministic adapter for tasks that don't need LLM reasoning (routing, validation, data fetching). API and CLI adapters for LLM-driven tasks.
-- **Triage routing** -- Content-aware message routing with keyword/regex matching, priority rules, and LLM fallback for ambiguous messages. Ownership chain logging for every routing decision.
-- **Loop detection and circuit breakers** -- Pattern-based loop detection (self-loops, ping-pong, blocked re-entry) plus circuit breakers with automatic human escalation when agents fail repeatedly.
-- **Learning pipeline** -- Structured feedback capture with auto-promotion: 3+ similar feedback records become a playbook, playbooks used by 3+ agents become reusable skills. Two-axis scoring (accuracy + efficiency).
-- **Governance gates** -- Independent QA, quality, and drift gates that validate agent output and report to the human operator. Gates run independently and cannot override each other.
-- **Permission relay** -- Remote approval for unattended agents via messaging platforms (Slack, Discord, Telegram). Dual approval: local terminal and remote, first response wins.
-- **LLM provider abstraction** -- Swap between Anthropic, OpenAI, and Ollama with a unified interface. Model aliasing, purpose-based routing, and fallback chains.
-- **Channel adapters** -- Connect to Slack, Discord, and webhooks. Auto-discovery, session management, and notification queuing.
-- **Workflow engine** -- Define multi-step workflows with dependency resolution, parallel execution, and conditional branching.
-- **SQLite data layer** -- Schema-driven tables, migrations, entity context rendering, and query builder via [latticesql](https://github.com/automated-industries/lattice). WAL mode for concurrent reads.
-- **Event-driven hooks** -- Priority-ordered, filter-based event bus for decoupled inter-layer communication.
+- **Loop detection and circuit breakers** -- Pattern-based loop detection (self-loops, ping-pong, blocked re-entry) plus circuit breakers with automatic human escalation.
+- **Learning pipeline** -- Structured feedback capture with auto-promotion: 3+ similar records become a playbook, 3+ agents become a reusable skill.
+- **Governance gates** -- Independent QA, quality, and drift gates that validate agent output and report to the human operator.
+- **Permission relay** -- Remote approval via messaging platforms (Slack, Discord, Telegram). Dual approval: local + remote, first wins.
+- **LLM provider abstraction** -- Swap between Anthropic, OpenAI, and Ollama. Model aliasing, purpose-based routing, fallback chains. Default LLM call wrapper included.
+- **Channel adapters** -- Slack (Bolt Socket Mode), Discord, and webhooks. Auto-discovery, session management, notification queuing.
+- **Workflow engine** -- Multi-step workflows with dependency resolution, parallel execution, and conditional branching.
+- **SQLite data layer** -- 27 core tables, migrations, entity context rendering via [latticesql](https://github.com/automated-industries/lattice). WAL mode.
+- **Event-driven hooks** -- Priority-ordered, filter-based event bus for decoupled communication.
 - **Budget controls** -- Per-agent and global cost tracking with warning thresholds and hard stops.
-- **Scheduling** -- Database-backed cron and one-time schedules that fire hook events.
-- **Connectors** -- Generic `Connector<T>` interface for external service integrations. Ships with Google Gmail and Calendar implementations (OAuth2 and service account auth).
-- **Domain tables** -- `defineDomainTables()` and `defineDomainEntityContexts()` for standard multi-agent app schemas (org, project, client, invoice, repository, and more).
-- **Auto-update** -- `autoUpdate()` checks npm for newer versions and installs them at startup.
-- **Security** -- Input sanitization, field length enforcement, audit logging, and HMAC webhook verification.
+- **Scheduling** -- Database-backed cron and one-time schedules.
+- **Connectors** -- Google Gmail and Calendar via OAuth2 and service account.
+- **Security** -- Input sanitization, field length enforcement, audit logging, HMAC webhook verification.
 
 ## Install
 
@@ -48,59 +50,60 @@ npm install googleapis
 
 ```typescript
 import {
-  HookBus,
-  DataStore,
-  defineCoreTables,
-  AgentRegistry,
-  TaskQueue,
-  RunManager,
+  HookBus, DataStore, defineCoreTables, initConfig,
+  TaskQueue, RunManager, WakeupQueue, ChatPipeline,
+  registerExecutionEngine, createDefaultLLMCall,
+  sendFileTool, readFileTool, listAgentsTool, getTaskStatusTool,
 } from 'botinabox';
+import { SlackBoltAdapter } from 'botinabox/slack';
+import Anthropic from '@anthropic-ai/sdk';
 
-// 1. Create core services
+// 1. Config (auto-loads botinabox.config.yml or uses defaults)
+initConfig({});
 const hooks = new HookBus();
 const db = new DataStore({ dbPath: './data/bot.db', wal: true, hooks });
-
-// 2. Define tables and initialize
 defineCoreTables(db);
 await db.init();
 
-// 3. Set up orchestration
-const agents = new AgentRegistry(db, hooks);
+// 2. Orchestration
 const tasks = new TaskQueue(db, hooks);
 const runs = new RunManager(db, hooks);
+const wakeups = new WakeupQueue(db);
 
-// 4. Register an agent
-const agentId = await agents.register({
-  slug: 'assistant',
-  name: 'Assistant',
-  adapter: 'api',
-  role: 'general',
+// 3. Execution engine with built-in tools
+const client = new Anthropic();
+await registerExecutionEngine({
+  db, hooks, runs,
+  config: {
+    client,
+    tools: [sendFileTool, readFileTool, listAgentsTool, getTaskStatusTool],
+  },
 });
 
-// 5. Listen for task creation
-hooks.register('task.created', async (ctx) => {
-  console.log(`Task created: ${ctx.taskId}`);
+// 4. Chat pipeline (6-layer: dedup → ack → interpret → dispatch → execute → respond)
+const llmCall = createDefaultLLMCall(client);
+const pipeline = new ChatPipeline(db, hooks, {
+  llmCall, tasks, wakeups,
+  systemPrompt: 'You are a helpful AI assistant.',
+  routingRules: [{ agentSlug: 'assistant', keywords: ['help'] }],
+  fallbackAgent: 'assistant',
 });
 
-// 6. Create a task
-const taskId = await tasks.create({
-  title: 'Summarize the quarterly report',
-  description: 'Read the Q4 report and produce a 3-paragraph summary.',
-  assignee_id: agentId,
-  priority: 3,
+// 5. Slack (one import, one start)
+const slack = new SlackBoltAdapter({
+  botToken: process.env.SLACK_BOT_TOKEN!,
+  appToken: process.env.SLACK_APP_TOKEN!,
+  hooks, pipeline,
 });
-
-// 7. Wire up task completion hooks
-hooks.register('run.completed', async (ctx) => {
-  console.log(`Run finished for task ${ctx.taskId}, exit code: ${ctx.exitCode}`);
-});
+await slack.start();
+tasks.startPolling();
 ```
 
 ## Subpath Exports
 
 | Import path | Description |
 |---|---|
-| `botinabox` | Core framework -- HookBus, DataStore, AgentRegistry, TaskQueue, RunManager, ChannelRegistry, MessagePipeline, Scheduler, config, security, and all shared types |
+| `botinabox` | Core framework -- HookBus, DataStore, ChatPipeline, ExecutionEngine, 22 built-in tools, config (loadConfig/getConfig), AgentRegistry, TaskQueue, RunManager, Scheduler, MessageStore, ChatResponder, MessageInterpreter, TriageRouter, createDefaultLLMCall, buildSystemContext, and all shared types |
 | `botinabox/anthropic` | Anthropic Claude provider (`createAnthropicProvider`) |
 | `botinabox/openai` | OpenAI GPT provider (`createOpenAIProvider`) |
 | `botinabox/ollama` | Ollama local model provider (`createOllamaProvider`) |
