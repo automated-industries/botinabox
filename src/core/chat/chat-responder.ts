@@ -78,6 +78,7 @@ export class ChatResponder {
     channel: string;
     userName?: string;
     capabilities?: string;
+    additionalContext?: string;
   }): Promise<string> {
     // Build context window from thread history
     const history = await this.messageStore.getThreadHistory(
@@ -94,6 +95,9 @@ export class ChatResponder {
     }
     if (opts.userName) {
       system += `\n\nYou are talking to: ${opts.userName}`;
+    }
+    if (opts.additionalContext) {
+      system += opts.additionalContext;
     }
 
     const result = await this.llmCall({

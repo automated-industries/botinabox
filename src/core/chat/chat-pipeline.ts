@@ -153,11 +153,23 @@ export class ChatPipeline {
       const { messageId } = await this.messageStore.storeInbound(msg);
 
       // ── Layer 2: Fast Response ─────────────────────────────────
+      // Include recent user message history for channel-wide context
+      const userHistory = await this.messageStore.getUserHistory(
+        msg.from, this.channel, 50,
+      );
+      const historyContext = userHistory
+        .map(m => {
+          const dir = m.direction === 'inbound' ? 'User' : 'Bot';
+          return `${dir}: ${(m.body as string)?.slice(0, 200) ?? ''}`;
+        })
+        .join('\n');
+
       const ackResponse = await this.responder.respond({
         messageBody: msg.body,
         threadId: threadTs,
         channel: this.channel,
         capabilities: this.capabilities,
+        additionalContext: historyContext ? `\n\nRecent conversation history:\n${historyContext}` : undefined,
       });
 
       await this.responder.sendResponse({
