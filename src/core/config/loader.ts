@@ -63,10 +63,12 @@ export function loadConfig(opts?: {
 
 let _config: BotConfig | null = null;
 
-/** Get the loaded config singleton. Call loadConfig() first. */
+/** Get the loaded config singleton. Auto-initializes with defaults if not loaded. */
 export function getConfig(): BotConfig {
-  if (!_config) throw new Error("Config not loaded — call loadConfig() first");
-  return _config;
+  if (!_config) {
+    initConfig({});
+  }
+  return _config!;
 }
 
 /** Initialize the config singleton. Returns errors if any. */
