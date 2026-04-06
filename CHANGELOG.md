@@ -34,7 +34,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - **22 built-in tools across 6 modules** — file ops (send, read, list, register), task ops (dispatch, cancel, reassign), status (task, agent, system, active tasks), roster (list agents, list projects, agent detail), messaging (send message, task comment, read conversation, search conversation), management (create agent, create project). All channel-agnostic. All with LLM-friendly descriptions.
 - **`ToolContext`** — tools receive `db`, `hooks`, `resolveFilePath` in their context.
-- Recovered 16 lost tools from internal refactor.
+- Recovered 16 previously-removed tools as framework primitives.
 
 ## [1.9.3] — 2026-04-05
 
