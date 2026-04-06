@@ -184,8 +184,9 @@ export class ChatPipeline {
         skipRedundancyCheck: true,
       });
 
-      // ── Layer 3-5: Async interpretation + dispatch ─────────────
-      // Dispatch async but track the promise for testability
+      // ── Layer 3-5: Interpretation + guaranteed task dispatch ────
+      // ALWAYS create a task programmatically. Interpretation enriches
+      // it with classification, but task creation is not LLM-dependent.
       const dispatchPromise = this.interpretAndDispatch(messageId, msg, threadTs, channelId);
       this.lastDispatch = dispatchPromise;
       void dispatchPromise;
@@ -213,6 +214,7 @@ export class ChatPipeline {
         agentId: ctx.agentId as string,
         taskId,
         source: 'agent',
+        skipRedundancyCheck: true, // Task results are always delivered
       });
     }, { priority: 90 });
   }
@@ -244,6 +246,9 @@ export class ChatPipeline {
 
   /**
    * Async interpretation + task dispatch (Layers 3-5).
+   *
+   * ALWAYS creates a task programmatically — task creation does not depend
+   * on LLM classification. Interpretation enriches but never gates dispatch.
    */
   private async interpretAndDispatch(
     messageId: string,
@@ -251,35 +256,97 @@ export class ChatPipeline {
     threadTs: string,
     channelId: string,
   ): Promise<void> {
+    // Layer 5: ALWAYS create a task — this is programmatic, not LLM-dependent
+    await this.guaranteedTaskDispatch(msg, threadTs, channelId);
+
+    // Layer 3-4: Interpretation is best-effort enrichment (memories, user context)
     try {
       const result = await this.interpreter.interpret(messageId);
-      // Layer 4: Post-Interpretation Response
-      if (result.tasks.length > 0 || result.memories.length > 0) {
+
+      // Store any extracted memories (enrichment only — task already created above)
+      if (result.memories.length > 0 || result.userContext.length > 0) {
         try {
-          const summary = this.buildSummary(result);
-          await this.responder.sendResponse({
-            text: summary,
-            channel: this.channel,
-            threadId: threadTs,
-            source: 'interpretation',
-          });
+          const parts: string[] = [];
+          if (result.memories.length > 0) {
+            parts.push(`Noted ${result.memories.length} thing${result.memories.length > 1 ? 's' : ''} to remember.`);
+          }
+          if (parts.length > 0) {
+            await this.responder.sendResponse({
+              text: parts.join(' '),
+              channel: this.channel,
+              threadId: threadTs,
+              source: 'interpretation',
+            });
+          }
         } catch {
-          // Summary send failure is non-fatal — proceed to dispatch
+          // Non-fatal
         }
       }
-
-      // Layer 5: Task Dispatch — always dispatch, execution layer decides if action needed
-      if (result.tasks.length > 0) {
-        await this.dispatchTasks(result, msg, threadTs, channelId);
-      }
     } catch (err) {
-      // Interpretation failure is non-fatal — ack was already sent
+      // Interpretation failure is non-fatal — task was already created above
       const errMsg = err instanceof Error ? err.message : String(err);
       await this.hooks.emit('interpretation.error', {
         messageId,
         error: errMsg,
       });
     }
+  }
+
+  /**
+   * Programmatic task creation — guaranteed, no LLM dependency.
+   */
+  private async guaranteedTaskDispatch(
+    msg: InboundMessage,
+    threadTs: string,
+    channelId: string,
+  ): Promise<void> {
+    // Route to best agent
+    const { agentSlug: targetSlug } = await this.router.route(msg);
+    if (!targetSlug) return;
+
+    const agents = await this.db.query('agents', { where: { slug: targetSlug } });
+    const targetAgent = agents[0];
+    if (!targetAgent) return;
+    const handlerAgentId = targetAgent.id as string;
+
+    // Follow-up in existing thread
+    if (threadTs) {
+      const existing = await this.db.query('thread_task_map', {
+        where: { thread_ts: threadTs, channel_id: channelId },
+      });
+      if (existing.length > 0) {
+        const taskId = existing[0]!.task_id as string;
+        const task = await this.tasks.get(taskId);
+        if (task && task.status !== 'done' && task.status !== 'cancelled') {
+          const updatedDesc = `${task.description ?? ''}\n\n---\n**Follow-up (${new Date().toISOString()}):**\n${msg.body}`;
+          await this.tasks.update(taskId, { description: updatedDesc });
+          await this.wakeups.enqueue(handlerAgentId, 'chat_followup', { taskId });
+          return;
+        }
+      }
+    }
+
+    // New task — programmatic, guaranteed
+    const description = `## Chat Message\n\n**Channel:** ${channelId}\n**Thread:** ${threadTs}\n**From:** ${msg.from}\n**Time:** ${msg.receivedAt}\n\n---\n\n${msg.body}`;
+
+    const taskId = randomUUID();
+    if (threadTs) {
+      await this.db.insert('thread_task_map', {
+        thread_ts: threadTs,
+        channel_id: channelId,
+        task_id: taskId,
+      });
+    }
+
+    await this.tasks.create({
+      id: taskId,
+      title: msg.body.slice(0, 120),
+      description,
+      assignee_id: handlerAgentId,
+      priority: 5,
+    });
+
+    await this.wakeups.enqueue(handlerAgentId, 'chat_dispatch', { taskId });
   }
 
   /**
