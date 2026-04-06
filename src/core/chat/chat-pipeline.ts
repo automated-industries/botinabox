@@ -143,12 +143,11 @@ export class ChatPipeline {
       if (await this.isDuplicate(msg)) return;
 
       // Resolve thread ID:
-      // - If in a Slack thread: use threadId (the parent message ts)
-      // - If in a DM (no thread): use the channel ID as a stable "thread"
-      //   so all messages in the same DM share context
-      const rawTs = (msg.raw as Record<string, unknown> | undefined)?.ts as string | undefined;
+      // Always use the channel ID (msg.account) as the stable thread identifier.
+      // In DMs, Slack auto-creates threads which fragment context. Using the
+      // channel ID ensures all messages in the same DM share one conversation.
       const channelId = msg.account ?? '';
-      const threadTs = msg.threadId ?? channelId ?? rawTs ?? msg.id;
+      const threadTs = channelId || msg.threadId || msg.id;
 
       // Track thread → channel for response routing
       if (threadTs && channelId) {
