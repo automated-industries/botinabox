@@ -72,6 +72,55 @@ export interface AgentConfig {
   config?: Record<string, unknown>;
 }
 
+export interface ExecutionConfig {
+  /** Model for task execution. Default: models.routing.task_execution */
+  model?: string;
+  /** Max tool loop iterations per task. Default: 5 */
+  maxIterations?: number;
+  /** Max tokens per LLM call. Default: 4096 */
+  maxTokens?: number;
+  /** Additional system prompt text appended to agent prompt */
+  systemPromptSuffix?: string;
+}
+
+export interface ChatConfig {
+  /** System prompt for the conversational responder */
+  systemPrompt?: string;
+  /** Max tokens for context window. Default: 4000 */
+  contextWindowTokens?: number;
+  /** Max recent outbound messages for redundancy check. Default: 10 */
+  redundancyWindow?: number;
+  /** Message dedup window in ms. Default: 300000 (5 min) */
+  dedupWindowMs?: number;
+  /** Max tokens for ack responses. Default: 500 */
+  responseMaxTokens?: number;
+}
+
+export interface RoutingConfig {
+  /** Routing rules for message triage */
+  rules: Array<{
+    agentSlug: string;
+    keywords?: string[];
+    patterns?: string[];
+    priority?: number;
+  }>;
+  /** Default agent when no rule matches */
+  fallbackAgent: string;
+  /** Use LLM for ambiguous messages. Default: false */
+  llmFallback?: boolean;
+}
+
+export interface SafetyConfig {
+  /** Circuit breaker failure threshold. Default: 3 */
+  circuitBreakerThreshold?: number;
+  /** Circuit breaker reset timeout ms. Default: 300000 (5 min) */
+  circuitBreakerResetMs?: number;
+  /** Max agent followup chain depth. Default: 5 */
+  maxChainDepth?: number;
+  /** Stale run detection threshold ms. Default: 1800000 (30 min) */
+  staleRunThresholdMs?: number;
+}
+
 export interface BotConfig {
   data: DataConfig;
   channels: Record<string, { enabled: boolean; accounts?: Record<string, unknown> } & Record<string, unknown>>;
@@ -88,6 +137,10 @@ export interface BotConfig {
   render: RenderConfig;
   updates: UpdateConfig;
   budget: BudgetConfig;
+  execution?: ExecutionConfig;
+  chat?: ChatConfig;
+  routing?: RoutingConfig;
+  safety?: SafetyConfig;
   workflows?: Record<string, WorkflowConfigEntry>;
 }
 
