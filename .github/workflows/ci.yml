@@ -33,3 +33,6 @@ jobs:
 
       - name: Verify ESM import
         run: node -e "import('./dist/index.js').then(m => { if (!m.DataStore) throw new Error('ESM export missing'); console.log('ESM OK'); })"
+
+      - name: Docs check
+        run: npm run check-docs
