@@ -21,7 +21,13 @@ export interface ToolDefinition {
 
 export type ToolHandler = (
   input: Record<string, unknown>,
-  context: { taskId: string; agentId: string; hooks: HookBus },
+  context: {
+    taskId: string;
+    agentId: string;
+    hooks: HookBus;
+    /** Resolve a relative file path to an absolute path (environment-aware). */
+    resolveFilePath?: (path: string) => string;
+  },
 ) => Promise<string>;
 
 export interface ExecutionEngineConfig {
@@ -45,6 +51,8 @@ export interface ExecutionEngineConfig {
   systemPromptSuffix?: string;
   /** Include system context (users, files, etc). Default: true */
   includeSystemContext?: boolean;
+  /** Resolve file paths from DB-relative to absolute (for cross-environment support). */
+  resolveFilePath?: (path: string) => string;
 }
 
 export async function registerExecutionEngine(opts: {
@@ -128,7 +136,7 @@ export async function registerExecutionEngine(opts: {
             try {
               const result = await handler(
                 toolUse.input as Record<string, unknown>,
-                { taskId, agentId: assigneeId, hooks },
+                { taskId, agentId: assigneeId, hooks, resolveFilePath: config.resolveFilePath },
               );
               toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id!, content: result });
             } catch (err) {
