@@ -128,6 +128,9 @@ export async function registerExecutionEngine(opts: {
         };
         if (toolDefs.length > 0) {
           createParams.tools = toolDefs;
+          // Force tool use on first iteration — agents must act, not narrate.
+          // Subsequent iterations use 'auto' so the agent can finish with text.
+          createParams.tool_choice = i === 0 ? { type: 'any' } : { type: 'auto' };
         }
 
         const response = await config.client.messages.create(createParams);
