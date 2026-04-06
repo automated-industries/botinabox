@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.2.1] — 2026-04-06
+
+### Changed
+
+- **Dependency upgrade** — Updated `latticesql` from 1.3.1 to 1.4.0. Includes prepared statement caching, batch entity query resolution, render change detection, and migration validation. No API changes to botinabox.
+
 ## [2.1.1] — 2026-04-06
 
 ### Fixed
