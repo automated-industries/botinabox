@@ -21,14 +21,17 @@ export interface ToolDefinition {
 
 export type ToolHandler = (
   input: Record<string, unknown>,
-  context: {
-    taskId: string;
-    agentId: string;
-    hooks: HookBus;
-    /** Resolve a relative file path to an absolute path (environment-aware). */
-    resolveFilePath?: (path: string) => string;
-  },
+  context: ToolContext,
 ) => Promise<string>;
+
+export interface ToolContext {
+  taskId: string;
+  agentId: string;
+  hooks: HookBus;
+  db: DataStore;
+  /** Resolve a relative file path to an absolute path (environment-aware). */
+  resolveFilePath?: (path: string) => string;
+}
 
 export interface ExecutionEngineConfig {
   /** Anthropic client instance */
@@ -136,7 +139,7 @@ export async function registerExecutionEngine(opts: {
             try {
               const result = await handler(
                 toolUse.input as Record<string, unknown>,
-                { taskId, agentId: assigneeId, hooks, resolveFilePath: config.resolveFilePath },
+                { taskId, agentId: assigneeId, hooks, db, resolveFilePath: config.resolveFilePath },
               );
               toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id!, content: result });
             } catch (err) {
