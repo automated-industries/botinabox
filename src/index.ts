@@ -39,6 +39,7 @@ export * from "./core/orchestrator/permission-relay.js";
 export * from "./core/orchestrator/governance-gate.js";
 export { registerExecutionEngine } from "./core/orchestrator/execution-engine.js";
 export type { ExecutionEngineConfig, ToolDefinition, ToolHandler } from "./core/orchestrator/execution-engine.js";
+export { sendFileTool, readFileTool } from "./core/orchestrator/tools/index.js";
 export * from "./core/orchestrator/user-registry.js";
 export * from "./core/orchestrator/secret-store.js";
 export * from "./core/orchestrator/claude-stream-parser.js";
