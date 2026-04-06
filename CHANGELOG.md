@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.4.0] — 2026-04-06
+
+### Added
+
+- **ChatPipelineV2** — Primary agent architecture replacing the 6-layer "dumb ack + headless execution" pattern. One agent is the conversational hub with full conversation history and tools. Answers simple questions directly, delegates complex work via `dispatch_task`. One response per message instead of separate ack + result.
+- **coordinatorTools** — Curated 16-tool set for multi-agent coordinator: task management, agent management, communication, and awareness tools. Excludes "work" tools (read_file, register_file) which are for specialist agents.
+- **Typing indicators** — `typing.start` and `typing.stop` events emitted during primary agent processing. Channel adapters can translate to platform-specific indicators.
+
 ## [2.3.2] — 2026-04-06
 
 ### Fixed

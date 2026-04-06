@@ -48,3 +48,25 @@ export const nativeTools = [
   sendMessageTool, addTaskCommentTool, readConversationTool, searchConversationTool,
   createAgentTool, createProjectTool,
 ];
+
+/**
+ * Coordinator tools for multi-agent primary agent.
+ * Orchestration + communication + awareness — no "work" tools.
+ * Use with ChatPipelineV2 in multi-agent mode.
+ *
+ * Single-agent mode should use `nativeTools` instead (all tools).
+ */
+export const coordinatorTools = [
+  // Task management
+  dispatchTaskTool, cancelTaskTool, reassignTaskTool,
+  // Progress monitoring
+  getTaskStatusTool, getActiveTasksTool,
+  // Agent management + awareness
+  listAgentsTool, getAgentStatusTool, getAgentDetailTool, createAgentTool,
+  // Communication (coordinator is the user-facing gateway)
+  sendMessageTool, addTaskCommentTool,
+  // Conversational context
+  readConversationTool, searchConversationTool,
+  // Awareness (for routing decisions, not for doing work)
+  listFilesTool, listProjectsTool, sendFileTool,
+];
