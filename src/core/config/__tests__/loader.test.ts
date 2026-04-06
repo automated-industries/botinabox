@@ -111,8 +111,12 @@ describe("initConfig / getConfig singleton — Story 1.2", () => {
   beforeEach(() => _resetConfig());
   afterEach(() => _resetConfig());
 
-  it("getConfig throws before initConfig", () => {
-    expect(() => getConfig()).toThrow("Config not loaded");
+  it("getConfig auto-initializes with defaults when not loaded", () => {
+    // Should NOT throw — auto-initializes with defaults
+    const config = getConfig();
+    expect(config).toBeDefined();
+    expect(config.data.path).toBe(DEFAULT_CONFIG.data.path);
+    expect(config.models).toBeDefined();
   });
 
   it("initConfig returns errors and getConfig returns config", () => {
@@ -120,6 +124,14 @@ describe("initConfig / getConfig singleton — Story 1.2", () => {
     expect(errors).toHaveLength(0);
     const cfg = getConfig();
     expect(cfg.data.path).toBe(DEFAULT_CONFIG.data.path);
+  });
+
+  it("getConfig never crashes even without prior loadConfig/initConfig", () => {
+    // Regression: prod crashed because getConfig() threw before loadConfig() ran.
+    // getConfig() must always return a valid config.
+    expect(() => getConfig()).not.toThrow();
+    const config = getConfig();
+    expect(Object.isFrozen(config)).toBe(true);
   });
 
   it("initConfig twice — second call overwrites singleton", () => {
