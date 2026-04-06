@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.3.1] — 2026-04-06
+
+### Fixed
+
+- **Forced tool use on first iteration** — ExecutionEngine now sets `tool_choice: { type: 'any' }` on the first LLM call, forcing agents to call at least one tool before responding with text. Previously agents could narrate their intentions without taking action, resulting in tasks that "completed" with no actual work done. Subsequent iterations use `auto` so agents can finish with a text summary after acting.
+
 ## [2.3.0] — 2026-04-06
 
 ### Fixed
