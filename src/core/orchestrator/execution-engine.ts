@@ -76,25 +76,32 @@ export async function registerExecutionEngine(opts: {
     (config.tools ?? []).map(t => [t.definition.name, t.handler]),
   );
 
-  hooks.register('task.created', async (ctx) => {
-    const taskId = ctx.id as string ?? ctx.taskId as string;
-    if (!taskId) return;
-
+  // ── Shared task execution logic ───────────────────────────────
+  async function tryExecuteTask(taskId: string, hintAgentId?: string): Promise<void> {
     const task = await db.get('tasks', { id: taskId });
     if (!task || task.status !== 'todo') return;
 
-    const assigneeId = task.assignee_id as string;
+    // Respect retry backoff
+    const nextRetryAt = task['next_retry_at'] as string | undefined;
+    if (nextRetryAt && new Date(nextRetryAt) > new Date()) return;
+
+    const assigneeId = hintAgentId ?? task.assignee_id as string;
     if (!assigneeId) return;
     if (runs.isLocked(assigneeId)) return;
 
     const agent = await db.get('agents', { id: assigneeId });
     if (!agent) return;
 
-    const runId = await runs.startRun(assigneeId, taskId, 'api');
+    let runId: string;
+    try {
+      runId = await runs.startRun(assigneeId, taskId, 'api');
+    } catch {
+      return; // Agent became locked between check and start (race condition)
+    }
+
     const prompt = (task.description as string) ?? (task.title as string) ?? '';
 
     try {
-      // Auto-generate tool listing from registered tool definitions
       const toolListing = toolDefs.length > 0
         ? `\n## Available Tools\n${toolDefs.map(t => `- **${t.name}**: ${t.description}`).join('\n')}\n\nUse your tools to take action. Do NOT describe what you would do — call the tool.`
         : '';
@@ -127,7 +134,6 @@ export async function registerExecutionEngine(opts: {
         totalInput += response.usage.input_tokens;
         totalOutput += response.usage.output_tokens;
 
-        // Collect text
         const textBlocks = response.content
           .filter(b => b.type === 'text')
           .map(b => b.text ?? '');
@@ -135,7 +141,6 @@ export async function registerExecutionEngine(opts: {
 
         if (response.stop_reason !== 'tool_use') break;
 
-        // Process tool calls
         const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
         const toolResults: Array<{ type: string; tool_use_id: string; content: string }> = [];
 
@@ -173,6 +178,35 @@ export async function registerExecutionEngine(opts: {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await runs.finishRun(runId, { exitCode: 1, output: `Execution error: ${msg}` });
+    }
+  }
+
+  // ── Hook: immediate execution on task creation ────────────────
+  hooks.register('task.created', async (ctx) => {
+    const taskId = ctx.id as string ?? ctx.taskId as string;
+    if (!taskId) return;
+    await tryExecuteTask(taskId);
+  });
+
+  // ── Hook: poll-based retry for tasks that missed task.created ─
+  hooks.register('agent.wakeup', async (ctx) => {
+    const taskId = ctx.taskId as string;
+    const agentId = ctx.agentId as string;
+    if (!taskId) return;
+    await tryExecuteTask(taskId, agentId);
+  });
+
+  // ── Hook: immediate pickup after a run completes ──────────────
+  hooks.register('run.completed', async (ctx) => {
+    const agentId = ctx.agentId as string;
+    if (!agentId) return;
+
+    const pendingTasks = (await db.query('tasks', { where: { status: 'todo' } }))
+      .filter(t => t['assignee_id'] === agentId)
+      .sort((a, b) => (a['priority'] as number) - (b['priority'] as number));
+
+    if (pendingTasks.length > 0) {
+      await tryExecuteTask(pendingTasks[0]!['id'] as string, agentId);
     }
   });
 }
