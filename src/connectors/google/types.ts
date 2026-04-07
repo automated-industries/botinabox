@@ -68,6 +68,33 @@ export interface EmailRecord {
   isRead: boolean;
 }
 
+// ── Drive records ─────────────────────────────────────────────
+
+export interface DriveOwner {
+  displayName: string;
+  emailAddress: string;
+}
+
+export interface DriveFileRecord {
+  driveFileId: string;
+  account: string;
+  name: string;
+  mimeType: string;
+  webViewLink: string;
+  webContentLink?: string;
+  /** ISO 8601 */
+  modifiedTime: string;
+  /** ISO 8601 */
+  createdTime: string;
+  size?: number;
+  parents?: string[];
+  description?: string;
+  owners: DriveOwner[];
+  lastModifyingUser?: DriveOwner;
+  starred: boolean;
+  trashed: boolean;
+}
+
 // ── Calendar records ───────────────────────────────────────────────
 
 export interface CalendarAttendee {
