@@ -102,6 +102,7 @@ export async function autoUpdate(
       cwd: process.cwd(),
       stdio: opts?.quiet ? "ignore" : "inherit",
       timeout: 60_000,
+      shell: process.platform === "win32",
     });
     result.updated = true;
     result.restartRequired = true;
