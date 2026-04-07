@@ -50,6 +50,8 @@ export interface ChatPipelineConfig {
   model?: string;
   /** Enable LLM fallback routing (default: false) */
   llmRouting?: boolean;
+  /** Skip the ack layer — no fast response before task dispatch (default: false) */
+  skipAck?: boolean;
   /** TaskQueue instance — required for task dispatch */
   tasks: {
     create(task: Record<string, unknown>): Promise<string>;
@@ -76,6 +78,7 @@ export class ChatPipeline {
   private readonly dedupWindowMs: number;
   private readonly tasks: ChatPipelineConfig['tasks'];
   private readonly wakeups: ChatPipelineConfig['wakeups'];
+  private readonly skipAck: boolean;
 
   // In-memory thread → channel mapping for response routing
   // (before thread_task_map exists)
@@ -93,6 +96,7 @@ export class ChatPipeline {
     this.messageFilter = config.messageFilter;
     this.capabilities = config.capabilities;
     this.dedupWindowMs = config.dedupWindowMs ?? DEFAULT_DEDUP_WINDOW_MS;
+    this.skipAck = config.skipAck ?? false;
     this.tasks = config.tasks;
     this.wakeups = config.wakeups;
 
@@ -171,22 +175,24 @@ export class ChatPipeline {
         })
         .join('\n');
 
-      const ackResponse = await this.responder.respond({
-        messageBody: msg.body,
-        threadId: threadTs,
-        channel: this.channel,
-        capabilities: this.capabilities,
-        additionalContext: historyContext ? `\n\nRecent conversation history:\n${historyContext}` : undefined,
-      });
+      if (!this.skipAck) {
+        const ackResponse = await this.responder.respond({
+          messageBody: msg.body,
+          threadId: threadTs,
+          channel: this.channel,
+          capabilities: this.capabilities,
+          additionalContext: historyContext ? `\n\nRecent conversation history:\n${historyContext}` : undefined,
+        });
 
-      await this.responder.sendResponse({
-        text: ackResponse,
-        channel: this.channel,
-        threadId: threadTs,
-        source: 'responder',
-        skipFilter: true,
-        skipRedundancyCheck: true,
-      });
+        await this.responder.sendResponse({
+          text: ackResponse,
+          channel: this.channel,
+          threadId: threadTs,
+          source: 'responder',
+          skipFilter: true,
+          skipRedundancyCheck: true,
+        });
+      }
 
       // ── Layer 3-5: Interpretation + guaranteed task dispatch ────
       // ALWAYS create a task programmatically. Interpretation enriches
