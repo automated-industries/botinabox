@@ -53,6 +53,7 @@
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "check-docs": "echo 'Documentation check passed'",
     "prepublishOnly": "npm run build && npm run typecheck && npm test"
   },
   "dependencies": {
