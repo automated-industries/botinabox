@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.4.3] — 2026-04-06
+
+### Added
+
+- **slugColumn overrides** in `DomainEntityContextOptions` — consumers can now set `projectSlugColumn`, `clientSlugColumn`, `orgSlugColumn`, `fileSlugColumn`, `channelSlugColumn` to control directory naming (default remains `'id'` for backwards compatibility).
+
 ## [2.4.0] — 2026-04-06
 
 ### Added
