@@ -1253,7 +1253,7 @@ const reply = await responder.respond({
   messageBody: 'deploy to staging',
   threadId: 'thread-1',
   channel: 'slack',
-  userName: 'Brian',
+  userName: 'John',
   capabilities: 'engineering, QA, research',
 });
 
