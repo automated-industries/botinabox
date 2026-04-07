@@ -18,6 +18,7 @@ import type { HookBus } from '../hooks/hook-bus.js';
 
 export interface FeedbackEntry {
   agentId: string;
+  userId?: string;       // who prompted the interaction
   taskId?: string;
   issue: string;
   rootCause?: string;
@@ -33,6 +34,7 @@ export interface PlaybookEntry {
   rule: string;
   feedbackIds: string[];
   projectScoped: boolean;
+  clientId?: string;     // scope playbook to a client
   agentIds?: string[];
 }
 
@@ -80,6 +82,7 @@ export class LearningPipeline {
   async captureFeedback(entry: FeedbackEntry): Promise<string> {
     const row = await this.db.insert('feedback', {
       agent_id: entry.agentId,
+      user_id: entry.userId,
       task_id: entry.taskId,
       issue: entry.issue,
       root_cause: entry.rootCause,
@@ -95,6 +98,7 @@ export class LearningPipeline {
     await this.hooks.emit('learning.feedback_captured', {
       feedbackId,
       agentId: entry.agentId,
+      userId: entry.userId,
       issue: entry.issue,
       severity: entry.severity,
     });
@@ -112,11 +116,13 @@ export class LearningPipeline {
    */
   async listFeedback(filter?: {
     agentId?: string;
+    userId?: string;
     severity?: string;
     repeatable?: boolean;
   }): Promise<Array<Record<string, unknown>>> {
     const where: Record<string, unknown> = {};
     if (filter?.agentId) where['agent_id'] = filter.agentId;
+    if (filter?.userId) where['user_id'] = filter.userId;
     if (filter?.severity) where['severity'] = filter.severity;
     if (filter?.repeatable !== undefined) where['repeatable'] = filter.repeatable ? 1 : 0;
     return this.db.query('feedback', Object.keys(where).length ? { where } : undefined);
@@ -174,6 +180,7 @@ export class LearningPipeline {
       rule: entry.rule,
       feedback_ids: JSON.stringify(entry.feedbackIds),
       project_scoped: entry.projectScoped ? 1 : 0,
+      client_id: entry.clientId,
     });
 
     const playbookId = row['id'] as string;
