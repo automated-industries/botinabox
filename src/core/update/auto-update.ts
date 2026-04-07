@@ -25,8 +25,15 @@ interface UpdateResult {
  */
 function getInstalledVersion(pkgName: string): string | null {
   try {
-    const pkgPath = join(process.cwd(), "node_modules", pkgName, "package.json");
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string };
+    const pkgPath = join(
+      process.cwd(),
+      "node_modules",
+      pkgName,
+      "package.json",
+    );
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
+      version: string;
+    };
     return pkg.version;
   } catch {
     return null;
@@ -73,7 +80,11 @@ export async function autoUpdate(
   opts?: { quiet?: boolean },
 ): Promise<UpdateResult> {
   const log = opts?.quiet ? () => {} : console.log;
-  const result: UpdateResult = { updated: false, packages: [], restartRequired: false };
+  const result: UpdateResult = {
+    updated: false,
+    packages: [],
+    restartRequired: false,
+  };
   const toInstall: string[] = [];
 
   for (const pkg of packages) {
@@ -85,7 +96,9 @@ export async function autoUpdate(
 
     if (isNewer(latest, installed)) {
       if (!SEMVER_RE.test(latest)) {
-        console.error(`[autoUpdate] Rejecting invalid version "${latest}" for ${pkg}`);
+        console.error(
+          `[autoUpdate] Rejecting invalid version "${latest}" for ${pkg}`,
+        );
         continue;
       }
       toInstall.push(`${pkg}@${latest}`);
@@ -102,10 +115,13 @@ export async function autoUpdate(
       cwd: process.cwd(),
       stdio: opts?.quiet ? "ignore" : "inherit",
       timeout: 60_000,
+      shell: process.platform === "win32",
     });
     result.updated = true;
     result.restartRequired = true;
-    log(`[autoUpdate] Updated successfully. Restart required for changes to take effect.`);
+    log(
+      `[autoUpdate] Updated successfully. Restart required for changes to take effect.`,
+    );
   } catch (err) {
     console.error("[autoUpdate] Failed to install updates:", err);
   }
