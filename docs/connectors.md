@@ -1,6 +1,6 @@
 # Connectors
 
-Connectors pull data from (and optionally push data to) external services. They produce typed records that your application decides how to store. botinabox ships with Google connectors for Gmail and Calendar.
+Connectors pull data from (and optionally push data to) external services. They produce typed records that your application decides how to store. botinabox ships with Google connectors for Gmail, Calendar, and Drive.
 
 ```bash
 npm install botinabox
@@ -9,7 +9,7 @@ npm install googleapis   # peer dependency for Google connectors
 
 ```typescript
 import type { Connector, SyncResult, SyncOptions } from 'botinabox';
-import { GoogleGmailConnector, GoogleCalendarConnector } from 'botinabox/google';
+import { GoogleGmailConnector, GoogleCalendarConnector, GoogleDriveConnector } from 'botinabox/google';
 ```
 
 ---
@@ -465,6 +465,140 @@ interface CalendarAttendee {
 
 ---
 
+## Google Drive Connector
+
+Pulls file metadata from Google Drive. Supports incremental sync via the Drive Changes API.
+
+```typescript
+import { GoogleDriveConnector } from 'botinabox/google';
+import type {
+  DriveFileRecord,
+  DriveOwner,
+  GoogleConnectorConfig,
+  DriveConnectorOpts,
+} from 'botinabox/google';
+```
+
+### Setup
+
+```typescript
+const drive = new GoogleDriveConnector();
+
+await drive.connect({
+  account: 'user@example.com',
+  serviceAccount: {
+    keyFile: '/path/to/service-account.json',
+    subject: 'user@example.com',
+  },
+  scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+});
+```
+
+Or with OAuth2:
+
+```typescript
+const drive = new GoogleDriveConnector({
+  tokenLoader: async (key) => db.get('secrets', key),
+  tokenSaver: async (key, value) => db.set('secrets', key, value),
+});
+
+await drive.connect({
+  account: 'user@example.com',
+  oauth: {
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    redirectUri: 'http://localhost:3000/oauth/callback',
+  },
+});
+```
+
+### Sync (pull file metadata)
+
+```typescript
+// Full sync -- all non-trashed files
+const result = await drive.sync({ limit: 200 });
+
+for (const file of result.records) {
+  console.log(`${file.name} (${file.mimeType})`);
+  console.log(`  Modified: ${file.modifiedTime}`);
+  console.log(`  Link: ${file.webViewLink}`);
+  console.log(`  Owners: ${file.owners.map(o => o.emailAddress).join(', ')}`);
+}
+
+// Scoped to a specific folder
+const folderResult = await drive.sync({
+  filters: { folderId: 'abc123-folder-id' },
+});
+
+// Scoped to PDFs only
+const pdfResult = await drive.sync({
+  filters: { mimeType: 'application/pdf' },
+});
+
+// Modified since a specific date
+const recentResult = await drive.sync({
+  since: '2025-06-01T00:00:00Z',
+});
+```
+
+### Incremental sync
+
+Drive uses the Changes API with a `startPageToken` for efficient incremental sync. If the token becomes invalid (HTTP 403/404), the connector automatically falls back to a full sync.
+
+```typescript
+const initial = await drive.sync({ limit: 500 });
+let cursor = initial.cursor;
+
+// Later: only new/changed/deleted files
+const delta = await drive.sync({ cursor });
+cursor = delta.cursor;
+
+// Deleted files appear with trashed: true
+for (const file of delta.records) {
+  if (file.trashed) {
+    console.log(`Deleted: ${file.driveFileId}`);
+  }
+}
+```
+
+### DriveFileRecord type
+
+```typescript
+interface DriveFileRecord {
+  driveFileId: string;
+  account: string;
+  name: string;
+  mimeType: string;
+  webViewLink: string;
+  webContentLink?: string;     // Direct download URL (binary files only)
+  modifiedTime: string;        // ISO 8601
+  createdTime: string;         // ISO 8601
+  size?: number;               // Bytes (not available for native Google Docs types)
+  parents?: string[];          // Parent folder IDs
+  description?: string;
+  owners: DriveOwner[];
+  lastModifyingUser?: DriveOwner;
+  starred: boolean;
+  trashed: boolean;
+}
+
+interface DriveOwner {
+  displayName: string;
+  emailAddress: string;
+}
+```
+
+### Sync filters
+
+| Filter | Type | Description |
+|--------|------|-------------|
+| `folderId` | `string` | Only files in this folder (not recursive). |
+| `mimeType` | `string` | Only files matching this MIME type. |
+
+Combine with `since` for date-scoped syncs, or `cursor` for incremental syncs.
+
+---
+
 ## OAuth Utilities
 
 The `botinabox/google` subpath exports low-level OAuth2 helpers for advanced use cases. Most users will not need these directly -- the connectors handle OAuth internally.
@@ -679,6 +813,11 @@ await syncLoop(
 
 - **Full sync**: Lists events using the Calendar Events API with `timeMin` (defaults to 30 days ago). Returns a `nextSyncToken` as the cursor.
 - **Incremental sync**: Uses the Calendar Events API with `syncToken`. If the token is expired (HTTP 410), automatically falls back to a full sync.
+
+### Drive sync details
+
+- **Full sync**: Lists files using the Drive Files API with optional `folderId`, `mimeType`, and `modifiedTime` filters. Excludes trashed files by default. Returns a `startPageToken` (from Changes API) as the cursor.
+- **Incremental sync**: Uses the Drive Changes API with `startPageToken`. Returns new/modified/deleted files. Deleted files have `trashed: true` and empty metadata. Falls back to full sync on HTTP 403/404.
 
 ---
 
