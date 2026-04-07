@@ -12,6 +12,12 @@ export interface DomainEntityContextOptions {
   files?: boolean;
   channels?: boolean;
   rules?: boolean;
+  /** Column used as directory name for each entity type. Default: 'id'. */
+  orgSlugColumn?: string;
+  projectSlugColumn?: string;
+  clientSlugColumn?: string;
+  fileSlugColumn?: string;
+  channelSlugColumn?: string;
 }
 
 /**
@@ -53,7 +59,7 @@ export function defineDomainEntityContexts(
   db.defineEntityContext("org", {
     table: "org",
     directory: "orgs",
-    slugColumn: "id",
+    slugColumn: opts.orgSlugColumn ?? "id",
     indexFile: "orgs/ORGS.md",
     files: {
       "ORG.md": {
@@ -82,7 +88,7 @@ export function defineDomainEntityContexts(
   db.defineEntityContext("project", {
     table: "project",
     directory: "projects",
-    slugColumn: "id",
+    slugColumn: opts.projectSlugColumn ?? "id",
     indexFile: "projects/PROJECTS.md",
     files: {
       "PROJECT.md": {
@@ -202,7 +208,7 @@ export function defineDomainEntityContexts(
     db.defineEntityContext("client", {
       table: "client",
       directory: "clients",
-      slugColumn: "id",
+      slugColumn: opts.clientSlugColumn ?? "id",
       indexFile: "clients/CLIENTS.md",
       files: {
         "CLIENT.md": {
@@ -287,7 +293,7 @@ export function defineDomainEntityContexts(
     db.defineEntityContext("file", {
       table: "file",
       directory: "files",
-      slugColumn: "id",
+      slugColumn: opts.fileSlugColumn ?? "id",
       indexFile: "files/FILES.md",
       files: {
         "FILE.md": {
@@ -317,7 +323,7 @@ export function defineDomainEntityContexts(
     db.defineEntityContext("channel", {
       table: "channel",
       directory: "channels",
-      slugColumn: "id",
+      slugColumn: opts.channelSlugColumn ?? "id",
       indexFile: "channels/CHANNELS.md",
       files: {
         "CHANNEL.md": {
