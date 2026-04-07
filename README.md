@@ -24,7 +24,7 @@ A modular TypeScript framework for building multi-agent bots with LLM orchestrat
 - **Event-driven hooks** -- Priority-ordered, filter-based event bus for decoupled communication.
 - **Budget controls** -- Per-agent and global cost tracking with warning thresholds and hard stops.
 - **Scheduling** -- Database-backed cron and one-time schedules.
-- **Connectors** -- Google Gmail and Calendar via OAuth2 and service account.
+- **Connectors** -- Google Gmail, Calendar, and Drive via OAuth2 and service account.
 - **Security** -- Input sanitization, field length enforcement, audit logging, HMAC webhook verification.
 
 ## Install
@@ -110,7 +110,7 @@ tasks.startPolling();
 | `botinabox/slack` | Slack channel adapter (`SlackAdapter`) |
 | `botinabox/discord` | Discord channel adapter (`DiscordAdapter`) |
 | `botinabox/webhook` | Webhook channel adapter with HMAC verification (`WebhookAdapter`) |
-| `botinabox/google` | Google connectors -- Gmail and Calendar via OAuth2 |
+| `botinabox/google` | Google connectors -- Gmail, Calendar, and Drive via OAuth2 |
 
 ## Architecture
 
