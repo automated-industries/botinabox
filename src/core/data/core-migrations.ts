@@ -42,4 +42,16 @@ export const CORE_MIGRATIONS: Array<{ version: string; sql: string }> = [
     version: "006_schedules_next_index",
     sql: `CREATE INDEX IF NOT EXISTS idx_schedules_next ON schedules(enabled, next_fire_at) WHERE deleted_at IS NULL`,
   },
+  {
+    version: "biab:2.5.0:feedback-user-id",
+    sql: `ALTER TABLE feedback ADD COLUMN user_id TEXT`,
+  },
+  {
+    version: "biab:2.5.0:feedback-user-idx",
+    sql: `CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id)`,
+  },
+  {
+    version: "biab:2.5.0:playbooks-client-id",
+    sql: `ALTER TABLE playbooks ADD COLUMN client_id TEXT`,
+  },
 ];
