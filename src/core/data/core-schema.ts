@@ -372,6 +372,7 @@ export function defineCoreTables(db: DataStore): void {
     columns: {
       id: "TEXT PRIMARY KEY",
       agent_id: "TEXT NOT NULL",
+      user_id: "TEXT",
       task_id: "TEXT",
       issue: "TEXT NOT NULL",
       root_cause: "TEXT",
@@ -385,6 +386,7 @@ export function defineCoreTables(db: DataStore): void {
     tableConstraints: [
       "CREATE INDEX IF NOT EXISTS idx_feedback_agent ON feedback(agent_id, created_at)",
       "CREATE INDEX IF NOT EXISTS idx_feedback_issue ON feedback(issue)",
+      "CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id)",
     ],
   });
 
@@ -395,6 +397,7 @@ export function defineCoreTables(db: DataStore): void {
       rule: "TEXT NOT NULL",
       feedback_ids: "TEXT NOT NULL DEFAULT '[]'",
       project_scoped: "INTEGER NOT NULL DEFAULT 1",
+      client_id: "TEXT",
       created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       deleted_at: "TEXT",
