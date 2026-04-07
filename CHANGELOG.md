@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.5.0] — 2026-04-07
+
+### Added
+
+- **GoogleDriveConnector** — New connector that pulls file metadata from Google Drive. Supports full sync (`files.list` with folder, MIME type, and date filters) and incremental sync via the Drive Changes API (`changes.list` with `startPageToken`). Deleted files appear as `trashed: true`. Falls back to full sync on expired tokens (HTTP 403/404). Same auth patterns as Gmail and Calendar (OAuth2 or service account).
+- **DriveFileRecord type** — Typed record with `driveFileId`, `name`, `mimeType`, `webViewLink`, `webContentLink`, `modifiedTime`, `createdTime`, `size`, `parents`, `description`, `owners`, `lastModifyingUser`, `starred`, `trashed`.
+- **DriveOwner type** — `{ displayName, emailAddress }` for file owners and last modifying user.
+
 ## [2.4.3] — 2026-04-06
 
 ### Added
