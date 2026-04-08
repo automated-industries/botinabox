@@ -20,6 +20,9 @@ import { listAgentsTool, listProjectsTool, getAgentDetailTool } from './roster.j
 // Communication (channel-agnostic: slack, email, discord, sms)
 import { sendMessageTool, addTaskCommentTool, readConversationTool, searchConversationTool } from './messaging.js';
 
+// Agent resolution (shared lookup: slug → role → name)
+import { resolveAgent } from './resolve-agent.js';
+
 // Entity creation
 import { createAgentTool, createProjectTool } from './management.js';
 
@@ -31,6 +34,7 @@ export {
   listAgentsTool, listProjectsTool, getAgentDetailTool,
   sendMessageTool, addTaskCommentTool, readConversationTool, searchConversationTool,
   createAgentTool, createProjectTool,
+  resolveAgent,
 };
 
 /**

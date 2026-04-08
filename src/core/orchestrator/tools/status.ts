@@ -2,6 +2,7 @@
  * Built-in tools: System awareness — task status, agent status, system health.
  */
 import type { ToolDefinition, ToolHandler } from '../execution-engine.js';
+import { resolveAgent } from './resolve-agent.js';
 
 export const getTaskStatusTool: { definition: ToolDefinition; handler: ToolHandler } = {
   definition: {
@@ -36,14 +37,13 @@ export const getAgentStatusTool: { definition: ToolDefinition; handler: ToolHand
     input_schema: {
       type: 'object',
       properties: {
-        agent_slug: { type: 'string', description: 'Agent slug (e.g. "engineer")' },
+        agent_slug: { type: 'string', description: 'Agent slug, role, or name (e.g. "eddy", "engineer", "Eddy")' },
       },
       required: ['agent_slug'],
     },
   },
   handler: async (input, ctx) => {
-    const agents = await ctx.db.query('agents', { where: { slug: input.agent_slug } });
-    const agent = agents[0];
+    const agent = await resolveAgent(ctx.db, input.agent_slug as string);
     if (!agent) return `Agent "${input.agent_slug}" not found.`;
     const tasks = await ctx.db.query('tasks', { where: { assignee_id: agent.id, status: 'todo' } });
     const runs = await ctx.db.query('runs', { where: { agent_id: agent.id as string }, limit: 5 });

@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.5.2] — 2026-04-08
+
+### Fixed
+
+- **Agent lookup by role in built-in tools** — `dispatch_task`, `get_agent_status`, `get_agent_detail`, and `reassign_task` now resolve agents by slug, role, or name (case-insensitive). Previously these tools only matched on `slug`, but their descriptions suggested using role names (e.g. "engineer"), causing lookups to fail when the LLM followed the tool description.
+
+### Added
+
+- **`resolveAgent` helper** — Shared agent resolution function exported from `botinabox`. Lookup order: exact slug → exact role → exact name → case-insensitive fallback.
+- **Tool agent lookup regression tests** — 11 tests covering slug, role, name, and case-insensitive agent resolution across all agent-resolving tools.
+
 ## [2.5.0] — 2026-04-07
 
 ### Added
