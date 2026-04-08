@@ -2,6 +2,7 @@
  * Built-in tools: Entity lookup — agents, projects, details.
  */
 import type { ToolDefinition, ToolHandler } from '../execution-engine.js';
+import { resolveAgent } from './resolve-agent.js';
 
 export const listAgentsTool: { definition: ToolDefinition; handler: ToolHandler } = {
   definition: {
@@ -42,8 +43,7 @@ export const getAgentDetailTool: { definition: ToolDefinition; handler: ToolHand
     },
   },
   handler: async (input, ctx) => {
-    const agents = await ctx.db.query('agents', { where: { slug: input.agent_slug } });
-    const agent = agents[0];
+    const agent = await resolveAgent(ctx.db, input.agent_slug as string);
     if (!agent) return `Agent "${input.agent_slug}" not found.`;
 
     const skills = await ctx.db.query('agent_skills', { where: { agent_id: agent.id as string } }).catch(() => []);

@@ -3,6 +3,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { ToolDefinition, ToolHandler } from '../execution-engine.js';
+import { resolveAgent } from './resolve-agent.js';
 
 export const dispatchTaskTool: { definition: ToolDefinition; handler: ToolHandler } = {
   definition: {
@@ -13,15 +14,14 @@ export const dispatchTaskTool: { definition: ToolDefinition; handler: ToolHandle
       properties: {
         title: { type: 'string', description: 'Short task title' },
         description: { type: 'string', description: 'Detailed task description' },
-        agent_slug: { type: 'string', description: 'Agent slug to assign to (e.g. "engineer", "qa")' },
+        agent_slug: { type: 'string', description: 'Agent slug, role, or name (e.g. "eddy", "engineer", "Eddy")' },
         priority: { type: 'number', description: 'Priority 1-10 (lower = higher priority). Default: 5' },
       },
       required: ['title', 'agent_slug'],
     },
   },
   handler: async (input, ctx) => {
-    const agents = await ctx.db.query('agents', { where: { slug: input.agent_slug } });
-    const agent = agents[0];
+    const agent = await resolveAgent(ctx.db, input.agent_slug as string);
     if (!agent) return `Error: agent "${input.agent_slug}" not found.`;
     const row = await ctx.db.insert('tasks', {
       id: randomUUID(),
@@ -63,7 +63,7 @@ export const reassignTaskTool: { definition: ToolDefinition; handler: ToolHandle
       type: 'object',
       properties: {
         task_id: { type: 'string', description: 'Task ID to reassign' },
-        new_agent_slug: { type: 'string', description: 'Agent slug to reassign to' },
+        new_agent_slug: { type: 'string', description: 'Agent slug, role, or name to reassign to' },
       },
       required: ['task_id', 'new_agent_slug'],
     },
@@ -71,8 +71,7 @@ export const reassignTaskTool: { definition: ToolDefinition; handler: ToolHandle
   handler: async (input, ctx) => {
     const task = await ctx.db.get('tasks', { id: input.task_id });
     if (!task) return `Error: task ${input.task_id} not found.`;
-    const agents = await ctx.db.query('agents', { where: { slug: input.new_agent_slug } });
-    const newAgent = agents[0];
+    const newAgent = await resolveAgent(ctx.db, input.new_agent_slug as string);
     if (!newAgent) return `Error: agent "${input.new_agent_slug}" not found.`;
     await ctx.db.update('tasks', { id: input.task_id }, { status: 'cancelled' });
     const row = await ctx.db.insert('tasks', {
