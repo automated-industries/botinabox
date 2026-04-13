@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.1] — 2026-04-13
+
+### Changed
+
+- **`latticesql` bumped to `^1.6.0`** — picks up the new pluggable database backend. Apps that pass a `postgres://` connection string to their latticesql `Lattice` now get a Postgres-backed DataStore for free; SQLite users see no behavior change. Triggered by the standard "republish botinabox after every latticesql release" rule. No botinabox source changes.
+
 ## [2.7.0] — 2026-04-13
 
 ### Added
