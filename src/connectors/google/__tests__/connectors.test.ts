@@ -243,6 +243,81 @@ describe('GoogleGmailConnector', () => {
       expect(r2.cc).toEqual([{ name: 'Eve', email: 'eve@example.com' }]);
       expect(r2.isRead).toBe(false); // has UNREAD label
     });
+
+    it('extracts attachments from multipart payload and skips inline parts', async () => {
+      await connector.connect(TEST_CONFIG);
+
+      mockGmail.users.messages.list.mockResolvedValue({
+        data: { messages: [{ id: 'att-1' }] },
+      });
+
+      mockGmail.users.messages.get.mockResolvedValueOnce({
+        data: {
+          id: 'att-1',
+          threadId: 'thread-att-1',
+          snippet: 'email with attachments',
+          labelIds: ['INBOX'],
+          payload: {
+            mimeType: 'multipart/mixed',
+            headers: [
+              { name: 'From', value: 'a@example.com' },
+              { name: 'To', value: 'b@example.com' },
+              { name: 'Subject', value: 'Invoice attached' },
+              { name: 'Date', value: 'Mon, 01 Jan 2024 12:00:00 +0000' },
+            ],
+            parts: [
+              {
+                mimeType: 'text/plain',
+                body: { data: Buffer.from('See attached').toString('base64') },
+              },
+              {
+                mimeType: 'application/pdf',
+                filename: 'invoice.pdf',
+                body: { attachmentId: 'att-abc', size: 12345 },
+                headers: [
+                  { name: 'Content-Disposition', value: 'attachment; filename="invoice.pdf"' },
+                ],
+              },
+              {
+                mimeType: 'image/png',
+                filename: 'signature.png',
+                body: { attachmentId: 'inline-1', size: 512 },
+                headers: [
+                  { name: 'Content-Disposition', value: 'inline; filename="signature.png"' },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      mockGmail.users.getProfile.mockResolvedValue({
+        data: { historyId: '1' },
+      });
+
+      const result = await connector.sync();
+      const r = result.records[0];
+      expect(r.attachments).toHaveLength(1);
+      expect(r.attachments[0]).toEqual({
+        attachmentId: 'att-abc',
+        filename: 'invoice.pdf',
+        mimeType: 'application/pdf',
+        size: 12345,
+      });
+    });
+
+    it('returns empty attachments array when payload has none', async () => {
+      await connector.connect(TEST_CONFIG);
+
+      mockGmail.users.messages.list.mockResolvedValue({
+        data: { messages: [{ id: 'plain-1' }] },
+      });
+      mockGmail.users.messages.get.mockResolvedValueOnce(gmailMessage('plain-1'));
+      mockGmail.users.getProfile.mockResolvedValue({ data: { historyId: '1' } });
+
+      const result = await connector.sync();
+      expect(result.records[0].attachments).toEqual([]);
+    });
   });
 
   // ── sync() incremental mode ───────────────────────────────────────
@@ -339,6 +414,7 @@ describe('GoogleGmailConnector', () => {
         body: 'Hello, world!',
         labels: [],
         isRead: true,
+        attachments: [],
       };
 
       const result = await connector.push(payload);
@@ -378,6 +454,7 @@ describe('GoogleGmailConnector', () => {
         snippet: '',
         labels: [],
         isRead: true,
+        attachments: [],
       };
 
       const result = await connector.push(payload);
