@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.5] — 2026-04-13
+
+### Fixed
+
+- **`DataStore.init()` and `DataStore.tableInfo()` now use the portable `lattice.adapter` API** instead of the SQLite-only `lattice.db` getter. Two call sites that previously broke on a Postgres-backed Lattice:
+  - `init()` ran deferred `CREATE INDEX` / etc. statements via `lattice.db.exec(stmt)`. Now uses `lattice.adapter.run(stmt)` (still single-statement; the existing semicolon-rejection guard above ensures one DDL per call).
+  - `tableInfo(table)` returned `lattice.db.pragma('table_info(...)')` rows. Now returns `lattice.adapter.introspectColumns(table)` mapped to the same `TableInfoRow` shape, with `cid` synthesized from index and `type` / `notnull` / `dflt_value` / `pk` zeroed under Postgres (current consumers — `column-validator`, schema tests — only read `.name`, so this is a compatible reduction).
+
+### Note
+
+botinabox now works against both SQLite and Postgres-backed Lattice instances. Combined with `latticesql@^1.6.5`, `new DataStore({ dbPath: 'postgres://...' })` boots cleanly end-to-end.
+
 ## [2.7.4] — 2026-04-13
 
 ### Changed
