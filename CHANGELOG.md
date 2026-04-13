@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.4] — 2026-04-13
+
+### Changed
+
+- **`latticesql` bumped to `^1.6.3`** — picks up the worker `.cjs` extension fix. The Postgres backend can now actually run under Node 18+ (1.6.0–1.6.2 silently failed to load the worker due to ESM/CJS mismatch). No botinabox source changes.
+
 ## [2.7.3] — 2026-04-13
 
 ### Changed
