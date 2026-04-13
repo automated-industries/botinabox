@@ -118,9 +118,13 @@ export class DataStore {
 
   async init(opts?: { migrations?: Array<{ version: string; sql: string }> }): Promise<void> {
     await this.lattice.init({ migrations: opts?.migrations });
-    // Run deferred statements (CREATE INDEX, etc.) after tables exist
+    // Run deferred statements (CREATE INDEX, etc.) after tables exist.
+    // Use the portable adapter API instead of `lattice.db.exec()` so this
+    // works under both SQLite and Postgres backends. Deferred statements
+    // are validated to be single-statement (no semicolons) above, so
+    // adapter.run() is the right call.
     for (const stmt of this.deferredStatements) {
-      this.lattice.db.exec(stmt);
+      this.lattice.adapter.run(stmt);
     }
     this._initialized = true;
   }
@@ -238,7 +242,21 @@ export class DataStore {
 
   tableInfo(table: string): TableInfoRow[] {
     this.assertInitialized();
-    return this.lattice.db.pragma(`table_info(${table})`) as TableInfoRow[];
+    // Use the portable adapter API instead of `lattice.db.pragma(...)` so
+    // this works under both SQLite and Postgres backends. The full
+    // PRAGMA-shaped row (cid/type/notnull/dflt_value/pk) is only available
+    // on SQLite; under Postgres we return name-only rows with the other
+    // fields zeroed. Current consumers (column-validator, schema tests)
+    // only read `.name`, so this is a compatible reduction.
+    const names = this.lattice.adapter.introspectColumns(table);
+    return names.map((name, cid) => ({
+      cid,
+      name,
+      type: '',
+      notnull: 0,
+      dflt_value: null,
+      pk: 0,
+    }));
   }
 
   // --- Lifecycle ------------------------------------------------------
