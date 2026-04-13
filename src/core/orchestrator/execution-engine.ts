@@ -33,6 +33,13 @@ export interface ToolContext {
   resolveFilePath?: (path: string) => string;
 }
 
+export interface ContextFile {
+  /** Absolute path, used as the `path` attribute in the wrapped XML tag. */
+  path: string;
+  /** Raw file contents (UTF-8). The engine does not read the filesystem itself. */
+  content: string;
+}
+
 export interface ExecutionEngineConfig {
   /** Anthropic client instance */
   client: {
@@ -56,6 +63,36 @@ export interface ExecutionEngineConfig {
   includeSystemContext?: boolean;
   /** Resolve file paths from DB-relative to absolute (for cross-environment support). */
   resolveFilePath?: (path: string) => string;
+  /**
+   * Optional per-dispatch context resolver. Called once per task pickup with
+   * the resolved agent and task rows. Returned files are wrapped in
+   * `<file path="...">...</file>` XML tags and inserted into the system
+   * prompt between the static `buildSystemContext` block and the tool
+   * listing. Intended for apps that want to inject per-agent or per-project
+   * rendered context (rules, playbooks, agent definitions) that is not
+   * already covered by `buildSystemContext`.
+   *
+   * The resolver owns all filesystem / database lookups — the engine does
+   * not touch the disk. If the resolver throws, the task fails loudly per
+   * Rule-16-style fail-loud semantics; there is no silent fallback.
+   */
+  resolveContextFiles?: (
+    ctx: { agent: Record<string, unknown>; task: Record<string, unknown> },
+  ) => Promise<ContextFile[]> | ContextFile[];
+}
+
+/**
+ * Wrap a set of context files in `<file path="...">...</file>` XML tags,
+ * joined by blank lines. Returns an empty string if the input is empty so
+ * callers can safely concatenate the result into a larger prompt without
+ * needing a conditional. Pure function — no I/O — so it can be unit-tested
+ * without touching the filesystem or a model.
+ */
+export function formatContextFilesBlock(files: ContextFile[]): string {
+  if (!files || files.length === 0) return '';
+  return files
+    .map((f) => `<file path="${f.path}">\n${f.content}\n</file>`)
+    .join('\n\n');
 }
 
 export async function registerExecutionEngine(opts: {
@@ -102,6 +139,15 @@ export async function registerExecutionEngine(opts: {
     const prompt = (task.description as string) ?? (task.title as string) ?? '';
 
     try {
+      // Per-dispatch context files (e.g. rendered agent/project rules).
+      // The resolver owns all I/O; the engine just concatenates what it
+      // gets back. Thrown errors propagate up to the outer catch and fail
+      // the run loudly — no silent fallback to an empty context.
+      const contextFiles = config.resolveContextFiles
+        ? await config.resolveContextFiles({ agent, task })
+        : [];
+      const contextFilesBlock = formatContextFilesBlock(contextFiles);
+
       const toolListing = toolDefs.length > 0
         ? `\n## Available Tools\n${toolDefs.map(t => `- **${t.name}**: ${t.description}`).join('\n')}\n\nUse your tools to take action. Do NOT describe what you would do — call the tool.`
         : '';
@@ -109,6 +155,7 @@ export async function registerExecutionEngine(opts: {
       const systemPrompt = [
         `You are ${agent.name}, an AI agent with role: ${agent.role}.`,
         systemContext ? `\n${systemContext}` : '',
+        contextFilesBlock ? `\n${contextFilesBlock}` : '',
         toolListing,
         config.systemPromptSuffix ?? '',
       ].filter(Boolean).join('\n');
