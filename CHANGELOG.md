@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.0] — 2026-04-13
+
+### Added
+
+- **`ExecutionEngineConfig.resolveContextFiles` hook** — `registerExecutionEngine()` accepts a new optional `resolveContextFiles` resolver on its config. The resolver receives the dispatched `{ agent, task }` rows and returns an array of `ContextFile` objects (`{ path, content }`). Returned files are wrapped in `<file path="...">...</file>` XML tags and inserted into the system prompt between the static `buildSystemContext` block and the tool listing. This lets apps inject per-agent or per-project rendered context (rules, playbooks, agent definitions, project-specific instructions) that is not already covered by the default system context. The resolver owns all filesystem and database lookups — the engine does no I/O of its own — and thrown errors propagate up to fail the task loudly with no silent fallback. All existing `registerExecutionEngine` callers are unaffected because the option is opt-in.
+- **`formatContextFilesBlock` exported pure function** — Formats a `ContextFile[]` as the XML-tagged block used by the resolver hook. Returns an empty string for empty input so callers can concatenate unconditionally. Pure, no I/O, covered by new tests in `execution-engine.test.ts`.
+- **`ContextFile` exported type** — `{ path: string; content: string }`. Exported alongside the hook so consumers can write typed resolvers.
+
 ## [2.6.0] — 2026-04-13
 
 ### Added
