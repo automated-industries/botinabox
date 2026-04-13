@@ -307,6 +307,7 @@ const sendResult = await gmail.push({
   body: 'This is the email body.',
   labels: [],
   isRead: true,
+  attachments: [],
 });
 
 if (sendResult.success) {
@@ -331,13 +332,23 @@ interface EmailRecord {
   body?: string;           // Full plain text body
   labels: string[];        // Gmail label IDs (e.g. 'INBOX', 'UNREAD')
   isRead: boolean;
+  attachments: EmailAttachment[];
 }
 
 interface EmailAddress {
   name?: string;
   email: string;
 }
+
+interface EmailAttachment {
+  attachmentId: string;    // Use with users.messages.attachments.get to download bytes
+  filename: string;
+  mimeType: string;
+  size: number;            // Bytes, as reported by Gmail
+}
 ```
+
+Attachments are populated from the Gmail payload tree. Inline parts (parts with `Content-Disposition: inline`) are excluded so `attachments` reflects what a human would call an attachment — e.g. an invoice PDF, but not an inline signature image. To download the bytes, call `users.messages.attachments.get({ userId, messageId, id: attachmentId })`.
 
 ### Health check
 

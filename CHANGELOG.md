@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.5.3] — 2026-04-13
+
+### Added
+
+- **Gmail attachments on `EmailRecord`** — `GoogleGmailConnector.sync()` now populates an `attachments` array on every returned `EmailRecord`. Each entry exposes `attachmentId`, `filename`, `mimeType`, and `size`. Callers can use `attachmentId` with `users.messages.attachments.get` to download the bytes on demand.
+- **`EmailAttachment` type** — New exported type from `botinabox/google`.
+- **Inline-part filtering** — Parts with a `Content-Disposition: inline` header (e.g. inline signature images) are excluded from `attachments` so the list reflects what a human would call an attachment.
+
+### Changed
+
+- **`EmailRecord.attachments` is required** — The field is non-optional; payloads with no attachments return an empty array. Consumers constructing `EmailRecord` literals (e.g. for `push()`) must include `attachments: []`.
+
 ## [2.5.2] — 2026-04-08
 
 ### Fixed
