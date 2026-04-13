@@ -417,6 +417,18 @@ Task Title + Description
     Output + Exit Code
 ```
 
+**Optional pass-through flags.** `execute()` accepts `sessionId`, `settings`, `appendSystemPrompt`, `addDirs`, and `extraArgs` on `ctx` to forward directly to the `claude` CLI:
+
+| Option | CLI flag | Purpose |
+|---|---|---|
+| `sessionId` | `--session-id <uuid>` | Resume (or start) a named conversation. Passing the same UUID across multiple calls maintains multi-turn history. |
+| `settings` | `--settings <json-or-path>` | Override settings without mutating the caller's global config (e.g. disable auto-memory per dispatch). |
+| `appendSystemPrompt` | `--append-system-prompt <text>` | Add caller-specific instructions to the default system prompt. |
+| `addDirs` | `--add-dir <paths...>` | Grant the subprocess tool access to extra directories beyond its `cwd`. |
+| `extraArgs` | passthrough | Arbitrary additional flags appended before the positional `--print` prompt. |
+
+The argv is constructed by `buildCliArgs()`, an exported pure function that callers can use for testing without spawning a subprocess.
+
 ### Deterministic Adapter (No LLM)
 
 The `DeterministicAdapter` executes user-specified scripts without any LLM calls. For tasks that don't require reasoning: routing, validation, data fetching, file transforms.

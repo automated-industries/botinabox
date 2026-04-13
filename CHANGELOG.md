@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.6.0] — 2026-04-13
+
+### Added
+
+- **`CliExecutionAdapter` session and settings pass-through** — `execute()` now accepts `sessionId`, `settings`, `appendSystemPrompt`, `addDirs`, and `extraArgs` on the `ctx` parameter. These map to the corresponding `claude` CLI flags (`--session-id`, `--settings`, `--append-system-prompt`, `--add-dir`, plus arbitrary passthrough). Passing a stable `sessionId` across calls lets multi-turn conversations resume the same Claude Code session instead of each dispatch starting fresh. `settings` accepts either a JSON string or a file path and lets callers override values like `autoMemoryDirectory` without mutating the operator's global config. All new parameters are optional — existing callers are unaffected.
+- **`buildCliArgs` exported helper** — Pure function that builds the `claude` argv array from a structured input. Extracted from `CliExecutionAdapter.execute()` so consumers can unit-test CLI invocation without spawning a subprocess. Covered by new tests in `cli-adapter.test.ts`.
+
 ## [2.5.3] — 2026-04-13
 
 ### Added
