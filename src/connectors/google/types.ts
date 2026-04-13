@@ -51,6 +51,15 @@ export interface EmailAddress {
   email: string;
 }
 
+export interface EmailAttachment {
+  /** The Gmail attachment ID — can be used with users.messages.attachments.get */
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  /** Size in bytes as reported by Gmail */
+  size: number;
+}
+
 export interface EmailRecord {
   gmailId: string;
   threadId: string;
@@ -66,6 +75,7 @@ export interface EmailRecord {
   body?: string;
   labels: string[];
   isRead: boolean;
+  attachments: EmailAttachment[];
 }
 
 // ── Drive records ─────────────────────────────────────────────
