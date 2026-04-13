@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.3] — 2026-04-13
+
+### Changed
+
+- **`latticesql` bumped to `^1.6.2`** — picks up the worker-file packaging fix. Apps that pass a `postgres://` connection string can now actually `init()` the Lattice (1.6.0 + 1.6.1 had a misleading "requires pg and synckit" error because `dist/postgres-worker.js` wasn't shipped). No botinabox source changes.
+
 ## [2.7.2] — 2026-04-13
 
 ### Changed
