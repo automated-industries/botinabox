@@ -397,6 +397,18 @@ Task Description + Context Files
                      Output + Token Usage
 ```
 
+**Context resolver hook.** When an app wires up agent execution via `registerExecutionEngine()`, it can pass a `resolveContextFiles` resolver on the `ExecutionEngineConfig`:
+
+```ts
+type ContextFile = { path: string; content: string };
+
+resolveContextFiles?: (
+  ctx: { agent: Record<string, unknown>; task: Record<string, unknown> }
+) => Promise<ContextFile[]> | ContextFile[];
+```
+
+The engine calls the resolver once per task pickup, wraps each returned file in `<file path="...">...</file>` XML tags via the exported `formatContextFilesBlock()` helper, and inserts the block into the system prompt between the static `buildSystemContext` output and the tool listing. The resolver owns all filesystem and database reads — the engine does no I/O of its own — and thrown errors propagate up to fail the task loudly with no silent fallback. Typical uses: injecting rendered per-agent rules, per-project playbooks, or shared CLAUDE.md-style platform documents into the system prompt without hard-coding them in the engine.
+
 ### CLI Adapter (Subprocess)
 
 The `CliExecutionAdapter` spawns a subprocess with the task prompt, captures stdout/stderr, and returns the output with the exit code.
