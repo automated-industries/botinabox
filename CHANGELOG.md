@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.2] — 2026-04-13
+
+### Changed
+
+- **`latticesql` bumped to `^1.6.1`** — picks up `PostgresAdapter`'s extra SQLite → Postgres translations (`INSERT OR IGNORE`, `randomblob`, `hex`, plus auto-enable of `pgcrypto`). Apps that pass a `postgres://` connection string to their latticesql `Lattice` get more existing migration code working unchanged. SQLite users see no behavior change. No botinabox source changes.
+
 ## [2.7.1] — 2026-04-13
 
 ### Changed
