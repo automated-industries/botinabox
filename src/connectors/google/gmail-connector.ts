@@ -16,6 +16,7 @@ import type {
 import type {
   EmailRecord,
   EmailAddress,
+  EmailAttachment,
   GoogleConnectorConfig,
   GoogleTokens,
 } from './types.js';
@@ -347,8 +348,57 @@ export class GoogleGmailConnector implements Connector<EmailRecord> {
       body: extractPlainTextBody(msg.payload),
       labels: msg.labelIds ?? [],
       isRead: !(msg.labelIds ?? []).includes('UNREAD'),
+      attachments: extractAttachments(msg.payload),
     };
   }
+}
+
+// ── Attachment extraction ─────────────────────────────────────────
+
+/**
+ * Walk the Gmail payload tree and collect every part that represents an
+ * attachment. Gmail marks attachment parts with a non-empty `filename` and a
+ * `body.attachmentId` handle that callers can use with
+ * `users.messages.attachments.get` to download the bytes.
+ *
+ * Inline images (parts with a `Content-Disposition: inline` header) are
+ * excluded so the count reflects what a human would call an "attachment".
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractAttachments(payload: any): EmailAttachment[] {
+  if (!payload) return [];
+  const out: EmailAttachment[] = [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const walk = (part: any): void => {
+    if (!part) return;
+
+    const filename: string = part.filename ?? '';
+    const attachmentId: string | undefined = part.body?.attachmentId;
+    if (filename && attachmentId) {
+      const dispositionHeader = (part.headers ?? []).find(
+        (h: { name: string }) =>
+          h.name.toLowerCase() === 'content-disposition',
+      );
+      const disposition: string = dispositionHeader?.value ?? '';
+      const isInline = disposition.toLowerCase().startsWith('inline');
+      if (!isInline) {
+        out.push({
+          attachmentId,
+          filename,
+          mimeType: part.mimeType ?? 'application/octet-stream',
+          size: typeof part.body?.size === 'number' ? part.body.size : 0,
+        });
+      }
+    }
+
+    if (Array.isArray(part.parts)) {
+      for (const child of part.parts) walk(child);
+    }
+  };
+
+  walk(payload);
+  return out;
 }
 
 // ── MIME body extraction ──────────────────────────────────────────
