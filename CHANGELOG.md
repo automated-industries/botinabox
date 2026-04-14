@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.8.1] — 2026-04-14
+
+### Added
+
+- **Drive file read primitives** in the Google connector. Three new exports: `downloadDriveFile` (binary files), `exportGoogleDoc` (Google-native → Office formats), and `readDriveFile` (auto-dispatching). All return a uniform `DriveFileBytes` shape — `{ buffer, mimeType, filename, size }`. The `GoogleDocExportAs` type enumerates valid export targets (`docx | xlsx | pptx | png | pdf | txt | csv | html`).
+- These primitives are signature-agnostic — they produce raw bytes + MIME type and can be wrapped into any future attachment enricher shape.
+
 ## [2.8.0] — 2026-04-14
 
 ### Added
