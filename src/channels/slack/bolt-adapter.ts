@@ -17,6 +17,8 @@ import type { ChatPipeline } from '../../core/chat/chat-pipeline.js';
 import { parseSlackEvent } from './inbound.js';
 import { formatForSlack } from './outbound.js';
 import { chunkText } from '../../core/chat/text-chunker.js';
+import type { AttachmentEnricherMap } from './enrichers/types.js';
+import { enrichAttachments } from './enrichers/enrich.js';
 
 // Minimal Bolt App interface — avoids @slack/bolt as compile-time dependency
 interface BoltApp {
@@ -34,6 +36,8 @@ export interface SlackBoltAdapterConfig {
   appToken: string;
   hooks: HookBus;
   pipeline: ChatPipeline;
+  /** Optional per-type attachment enrichers. */
+  attachmentEnrichers?: AttachmentEnricherMap;
 }
 
 export class SlackBoltAdapter {
@@ -73,6 +77,10 @@ export class SlackBoltAdapter {
 
       if (inbound.body.includes('[Voice message — no transcript available]')) {
         inbound = await enrichVoiceMessage(inbound, botToken);
+      }
+
+      if (inbound.attachments?.length && this.config.attachmentEnrichers) {
+        inbound = await enrichAttachments(inbound, botToken, this.config.attachmentEnrichers);
       }
 
       await hooks.emit('message.inbound', inbound as unknown as Record<string, unknown>);
