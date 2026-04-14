@@ -1,28 +1,35 @@
-import type { Attachment, InboundMessage } from "../../../shared/types/channel.js";
-import type { AttachmentMediaType } from "../../../shared/types/channel.js";
+import type { Attachment, AttachmentMediaType, InboundMessage } from "../../../shared/types/channel.js";
+import type { ContentBlock } from "../../../shared/types/provider.js";
 
 /**
- * An AttachmentEnricher downloads an attachment and extracts its textual content.
+ * Transport-specific context passed to every enricher. Extensible — add a new
+ * optional sub-context when wiring a new source (gmail, drive, dropbox, etc.)
+ * and enrichers that need it can type-guard.
+ */
+export interface EnrichmentContext {
+  slack?: { botToken: string };
+  drive?: { client: unknown };
+  gmail?: { client: unknown };
+}
+
+/**
+ * An AttachmentEnricher downloads an attachment and returns Claude content
+ * blocks representing it. Text blocks become part of the message body; image
+ * and document blocks flow through to the Anthropic provider unchanged.
  *
- * Returns the extracted text on success, or `null` on failure. The framework
- * surfaces the filename/URL as a fallback when the enricher returns null.
- *
- * @param attachment - The attachment metadata (type, url, filename, etc.)
- * @param botToken - Slack bot token, required for authenticated downloads from url_private
+ * Enrichers throw on failure. The framework catches and falls back to a
+ * plain `[Attached: <filename>]` breadcrumb in the message body.
  */
 export type AttachmentEnricher = (
   attachment: Attachment,
-  botToken: string,
-) => Promise<string | null>;
+  ctx: EnrichmentContext,
+) => Promise<ContentBlock[]>;
 
-/**
- * A map from attachment type to the enricher that handles it.
- * Types without an entry fall through to the framework's default behavior
- * (surfacing filename + URL in the message body).
- */
 export type AttachmentEnricherMap = Partial<Record<AttachmentMediaType, AttachmentEnricher>>;
 
 /** Internal: the result of running enrichAttachments on a message. */
 export interface EnrichedMessage extends InboundMessage {
   body: string;
 }
+
+export type { InboundMessage };

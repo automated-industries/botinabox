@@ -402,6 +402,78 @@ describe('ChatPipelineV2 — Primary Agent Architecture', () => {
       expect(inbound.length).toBeGreaterThanOrEqual(1);
     });
 
+    it('passes attachmentBlocks through as a multimodal user message', async () => {
+      let firstCallMessages: Array<{ role: string; content: unknown }> | undefined;
+      const llmCall = async (params: Record<string, unknown>) => {
+        if (!firstCallMessages) {
+          firstCallMessages = (params.messages as Array<{ role: string; content: unknown }>).slice();
+        }
+        return {
+          content: [{ type: 'text', text: 'seen the image' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      const imageBlock = {
+        type: 'image' as const,
+        source: { type: 'base64' as const, media_type: 'image/png', data: 'ZZZZ' },
+      };
+      const msg = makeMessage('describe this', {
+        attachmentBlocks: [imageBlock],
+      });
+
+      await hooks.emit('message.inbound', msg as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(firstCallMessages).toBeDefined();
+      const userMsgs = firstCallMessages!.filter(m => m.role === 'user');
+      const last = userMsgs[userMsgs.length - 1];
+      expect(last).toBeDefined();
+      expect(Array.isArray(last!.content)).toBe(true);
+      const blocks = last!.content as Array<{ type: string; text?: string; source?: unknown }>;
+      expect(blocks[0]).toMatchObject({ type: 'image', source: imageBlock.source });
+      expect(blocks[blocks.length - 1]).toEqual({ type: 'text', text: 'describe this' });
+    });
+
+    it('uses plain string content when no attachmentBlocks are present', async () => {
+      let firstCallMessages: Array<{ role: string; content: unknown }> | undefined;
+      const llmCall = async (params: Record<string, unknown>) => {
+        if (!firstCallMessages) {
+          firstCallMessages = (params.messages as Array<{ role: string; content: unknown }>).slice();
+        }
+        return {
+          content: [{ type: 'text', text: 'hi' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('plain text only') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(firstCallMessages).toBeDefined();
+      const userMsgs = firstCallMessages!.filter(m => m.role === 'user');
+      const last = userMsgs[userMsgs.length - 1];
+      expect(last).toBeDefined();
+      expect(typeof last!.content).toBe('string');
+      expect(last!.content).toBe('plain text only');
+    });
+
     it('stores messages with consistent thread_id for DM context', async () => {
       new ChatPipelineV2(db, hooks, {
         llmCall: mockLlmCallV2(),
