@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.11] — 2026-04-14
+
+### Fixed
+
+- **`SlackBoltAdapter` now forwards `thread_ts` in `response.ready` and `file.deliver` handlers** — replies and file uploads are correctly posted in-thread when the hook context includes a `threadId`. Previously, `threadId` was read but never forwarded to `chat.postMessage` or `filesUploadV2`, causing all outbound messages to appear at the top of the channel.
+
 ## [2.7.10] — 2026-04-14
 
 ### Changed
