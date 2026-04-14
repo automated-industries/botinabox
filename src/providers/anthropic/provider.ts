@@ -33,7 +33,7 @@ export class AnthropicProvider implements LLMProvider {
       .map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: typeof m.content === 'string' ? m.content : m.content,
-      }));
+      } as Anthropic.MessageParam));
 
     const response = await this.client.messages.create(
       {
@@ -84,7 +84,7 @@ export class AnthropicProvider implements LLMProvider {
       .map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: typeof m.content === 'string' ? m.content : m.content,
-      }));
+      } as Anthropic.MessageParam));
 
     const stream = this.client.messages.stream(
       {
