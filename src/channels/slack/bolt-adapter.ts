@@ -95,6 +95,7 @@ export class SlackBoltAdapter {
           token: botToken,
           channel: channelId,
           text: chunk,
+          ...(threadId ? { thread_ts: threadId } : {}),
         });
       }
     }, { priority: 90 });
@@ -119,6 +120,7 @@ export class SlackBoltAdapter {
             file: createReadStream(filePath),
             filename: basename(filePath),
             title: fileName ?? basename(filePath),
+            ...(threadId ? { thread_ts: threadId } : {}),
           });
         }
       } catch {
