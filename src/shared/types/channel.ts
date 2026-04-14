@@ -34,8 +34,20 @@ export interface InboundMessage {
   raw?: unknown;
 }
 
+export type AttachmentMediaType =
+  | "image"
+  | "video"
+  | "audio"
+  | "pdf"
+  | "doc"
+  | "excel"
+  | "presentation"
+  | "html"
+  | "link"
+  | "misc";
+
 export interface Attachment {
-  type: "image" | "file" | "audio" | "video";
+  type: AttachmentMediaType;
   url?: string;
   mimeType?: string;
   filename?: string;

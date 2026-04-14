@@ -6,6 +6,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.8.0] — 2026-04-14
+
+### Added
+
+- **Slack attachment enrichment pipeline.** `SlackBoltAdapter` now accepts an `attachmentEnrichers` config that runs per-type extractors over inbound file attachments. Extracted content is appended to the message body so downstream agents can read PDFs, images, spreadsheets, and other formats as if they were text.
+- **`Attachment.type` extended to 10 categories** — `"image" | "video" | "audio" | "pdf" | "doc" | "excel" | "presentation" | "html" | "link" | "misc"` — aligned with broader observation media types. Also exports a new `AttachmentMediaType` type alias.
+- **`parseSlackEvent` now populates `InboundMessage.attachments[]`** from non-audio file uploads and scans message text for URLs (surfaced as `"link"` attachments).
+- **`ContentBlock` gains `image` and `document` variants** matching the Claude multimodal API shapes (`{ type: "image", source: { type: "base64", media_type, data } }` and `{ type: "document", ... }`).
+- **Built-in image and PDF enricher factories** — `createImageEnricher({ apiKey })` and `createPdfEnricher({ apiKey })` use the Claude vision / document API directly. Consumers wire them into the adapter via `attachmentEnrichers: { image: createImageEnricher(...), pdf: createPdfEnricher(...) }`.
+- **New `slackFiletypeToMediaType` and `extractUrls` helpers** exported from the Slack channel module — extensible via a filetype registry.
+
+### Notes
+
+- The audio / voice-message path (`enrichVoiceMessage`) is unchanged. Audio files are not duplicated into `attachments[]`.
+- Consumers that extract docx / xlsx / pptx / html install their own extraction libs and register enrichers — botinabox ships no new document parsing dependencies in this release.
+
 ## [2.7.11] — 2026-04-14
 
 ### Fixed
