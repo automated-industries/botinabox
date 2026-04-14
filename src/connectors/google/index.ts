@@ -8,3 +8,10 @@ export { GoogleCalendarConnector } from './calendar-connector.js';
 export type { CalendarConnectorOpts } from './calendar-connector.js';
 export { GoogleDriveConnector } from './drive-connector.js';
 export type { DriveConnectorOpts } from './drive-connector.js';
+export {
+  downloadDriveFile,
+  exportGoogleDoc,
+  readDriveFile,
+  type DriveFileBytes,
+  type GoogleDocExportAs,
+} from './drive-read.js';
