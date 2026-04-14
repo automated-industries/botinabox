@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.7] — 2026-04-14
+
+### Changed
+- **`latticesql` bumped to `^1.6.7`** — picks up CREATE VIEW IF NOT EXISTS translation.
+
 ## [2.7.6] — 2026-04-14
 
 ### Changed
