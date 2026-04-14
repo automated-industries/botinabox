@@ -256,3 +256,138 @@ describe("Voice message parsing", () => {
     })).toBe("Hello world");
   });
 });
+
+describe("parseSlackEvent — attachments", () => {
+  it("populates attachments from file_share with PDF", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000006",
+      channel: "C123",
+      user: "U456",
+      text: "Here is a PDF",
+      files: [{
+        id: "F6",
+        filetype: "pdf",
+        name: "report.pdf",
+        url_private: "https://files.slack.com/report.pdf",
+        size: 51200,
+        mimetype: "application/pdf",
+      }],
+    });
+    expect(msg.attachments).toHaveLength(1);
+    expect(msg.attachments![0].type).toBe("pdf");
+    expect(msg.attachments![0].url).toBe("https://files.slack.com/report.pdf");
+    expect(msg.attachments![0].filename).toBe("report.pdf");
+    expect(msg.attachments![0].size).toBe(51200);
+  });
+
+  it("populates attachments from file_share with docx", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000007",
+      channel: "C123",
+      user: "U456",
+      text: "Document",
+      files: [{
+        id: "F7",
+        filetype: "docx",
+        name: "contract.docx",
+        url_private: "https://files.slack.com/contract.docx",
+      }],
+    });
+    expect(msg.attachments).toHaveLength(1);
+    expect(msg.attachments![0].type).toBe("doc");
+  });
+
+  it("populates link attachments from URLs in message text", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      ts: "1700000000.000008",
+      channel: "C123",
+      user: "U456",
+      text: "Check https://example.com and http://test.com",
+    });
+    expect(msg.attachments).toHaveLength(2);
+    expect(msg.attachments![0].type).toBe("link");
+    expect(msg.attachments![0].url).toBe("https://example.com");
+    expect(msg.attachments![1].type).toBe("link");
+    expect(msg.attachments![1].url).toBe("http://test.com");
+  });
+
+  it("returns undefined attachments for messages with no files or URLs", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      ts: "1700000000.000009",
+      channel: "C123",
+      user: "U456",
+      text: "Plain text message",
+    });
+    expect(msg.attachments).toBeUndefined();
+  });
+
+  it("skips audio files from attachments (handled by voice path)", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000010",
+      channel: "D123",
+      user: "U456",
+      text: "",
+      files: [{
+        id: "F10",
+        filetype: "aac",
+        subtype: "slack_audio",
+        transcription: { status: "complete", preview: { content: "Audio transcript" } },
+      }],
+    });
+    expect(msg.attachments).toBeUndefined();
+    expect(msg.body).toBe("[Voice message] Audio transcript");
+  });
+
+  it("combines file attachments and URL attachments", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000011",
+      channel: "C123",
+      user: "U456",
+      text: "See attachment and https://example.com",
+      files: [{
+        id: "F11",
+        filetype: "pdf",
+        name: "doc.pdf",
+        url_private: "https://files.slack.com/doc.pdf",
+      }],
+    });
+    expect(msg.attachments).toHaveLength(2);
+    expect(msg.attachments![0].type).toBe("pdf");
+    expect(msg.attachments![1].type).toBe("link");
+  });
+
+  it("uses file title as fallback filename", async () => {
+    const { parseSlackEvent } = await import("../inbound.js");
+    const msg = parseSlackEvent({
+      type: "message",
+      subtype: "file_share",
+      ts: "1700000000.000012",
+      channel: "C123",
+      user: "U456",
+      text: "",
+      files: [{
+        id: "F12",
+        filetype: "pdf",
+        title: "Important Document",
+        url_private: "https://files.slack.com/doc.pdf",
+      }],
+    });
+    expect(msg.attachments![0].filename).toBe("Important Document");
+  });
+});

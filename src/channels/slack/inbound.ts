@@ -3,8 +3,9 @@
  * Story 4.5
  */
 
-import type { InboundMessage } from "../../shared/index.js";
+import type { InboundMessage, Attachment } from "../../shared/index.js";
 import { transcribeAudio, downloadAudio } from "./transcribe.js";
+import { slackFiletypeToMediaType, extractUrls } from "./media-type.js";
 
 export interface SlackFile {
   id?: string;
@@ -90,12 +91,38 @@ export function parseSlackEvent(event: SlackEvent): InboundMessage {
     }
   }
 
+  // Non-audio file attachments → Attachment[]
+  const attachments: Attachment[] = [];
+  if (event.subtype === "file_share" && event.files?.length) {
+    for (const file of event.files) {
+      // Skip audio — handled by voice-message path above
+      const isAudio = file.subtype === "slack_audio" || AUDIO_TYPES.has(file.filetype ?? "");
+      if (isAudio) continue;
+
+      attachments.push({
+        type: slackFiletypeToMediaType(file.filetype),
+        url: file.url_private,
+        mimeType: (file as Record<string, unknown>).mimetype as string | undefined,
+        filename: ((file as Record<string, unknown>).name as string | undefined)
+          ?? ((file as Record<string, unknown>).title as string | undefined),
+        size: (file as Record<string, unknown>).size as number | undefined,
+      });
+    }
+  }
+
+  // URLs in message text → "link" attachments
+  const urls = extractUrls(body);
+  for (const url of urls) {
+    attachments.push({ type: "link", url });
+  }
+
   return {
     id,
     channel,
     from,
     body,
     threadId,
+    attachments: attachments.length > 0 ? attachments : undefined,
     receivedAt,
     raw: event,
   };
