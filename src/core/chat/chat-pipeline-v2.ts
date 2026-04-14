@@ -25,7 +25,7 @@ import { ChatResponder } from './chat-responder.js';
 import { MessageInterpreter } from './message-interpreter.js';
 import { buildSystemContext } from '../data/context-builder.js';
 
-type ContentBlock = { type: string; text?: string; id?: string; name?: string; input?: unknown };
+type ContentBlock = { type: string; text?: string; id?: string; name?: string; input?: unknown; source?: unknown };
 type MessageParam = { role: string; content: string | ContentBlock[] };
 
 export interface ChatPipelineV2Config {
@@ -229,7 +229,7 @@ export class ChatPipelineV2 {
 
         // ── Phase 2: THINK ─────────────────────────────────────
         const { text, tasksDispatched } = await this.think(
-          systemPrompt, history, msg.body, threadTs, channelId,
+          systemPrompt, history, msg.body, threadTs, channelId, msg.attachmentBlocks,
         );
 
         // ── Phase 3: RESPOND ───────────────────────────────────
@@ -296,16 +296,22 @@ export class ChatPipelineV2 {
     currentMessage: string,
     threadTs: string,
     channelId: string,
+    attachmentBlocks?: ContentBlock[],
   ): Promise<{ text: string; tasksDispatched: string[] }> {
     const model = this.config.model ?? 'claude-sonnet-4-6';
     const maxIterations = this.config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
     const maxTokens = this.config.maxTokens ?? DEFAULT_MAX_TOKENS;
     const tasksDispatched: string[] = [];
 
-    // Build messages: history + current
+    // Build messages: history + current. When attachment enrichers produced
+    // image/document blocks, build a multimodal user message so the provider
+    // consumes the media natively.
+    const userContent: string | ContentBlock[] = attachmentBlocks?.length
+      ? [...attachmentBlocks, { type: 'text', text: currentMessage }]
+      : currentMessage;
     const messages: MessageParam[] = [
       ...history,
-      { role: 'user', content: currentMessage },
+      { role: 'user', content: userContent },
     ];
 
     let finalText = '';
