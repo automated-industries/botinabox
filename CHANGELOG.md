@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.6] — 2026-04-14
+
+### Changed
+
+- **`latticesql` bumped to `^1.6.6`** — picks up the INSERT OR IGNORE + SELECT-with-string-literals translation fix. No botinabox source changes.
+
 ## [2.7.5] — 2026-04-13
 
 ### Fixed
