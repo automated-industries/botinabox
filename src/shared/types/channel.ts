@@ -1,5 +1,7 @@
 /** Channel adapter types — Story 1.5 / 4.1 */
 
+import type { ContentBlock } from "./provider.js";
+
 export type ChatType = "direct" | "group" | "channel";
 export type FormattingMode = "markdown" | "mrkdwn" | "html" | "plain";
 
@@ -30,6 +32,12 @@ export interface InboundMessage {
   threadId?: string;
   replyToId?: string;
   attachments?: Attachment[];
+  /**
+   * Multimodal content blocks produced by attachment enrichers.
+   * When set, ChatPipeline builds a multimodal user message that passes
+   * these blocks through to the LLM provider alongside `body`.
+   */
+  attachmentBlocks?: ContentBlock[];
   receivedAt: string;       // ISO 8601
   raw?: unknown;
 }

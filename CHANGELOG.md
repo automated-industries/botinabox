@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.0] — 2026-04-14
+
+### Changed (breaking)
+
+- **`AttachmentEnricher` signature changed** from `(att, botToken) => Promise<string | null>` to `(att, ctx: EnrichmentContext) => Promise<ContentBlock[]>`. Enrichers now return Claude content blocks and throw on failure. `EnrichmentContext` is extensible — wire new transport clients (drive, gmail, etc.) without changing the signature again.
+- **`InboundMessage.attachmentBlocks?: ContentBlock[]`** — new optional field that carries image/document blocks from enrichers through to the LLM provider. `ChatPipelineV2.think()` builds a multimodal user message when this field is populated.
+- **`createImageEnricher` renamed to `createSlackImageEnricher`** — takes no config arguments. Returns a single `image` ContentBlock; no intermediate vision API call. The downstream Anthropic provider consumes the raw image natively.
+- **`createPdfEnricher` renamed to `createSlackPdfEnricher`** — same pattern, returns a `document` ContentBlock.
+
+### Migration from 2.8.x
+
+Consumers calling `createImageEnricher({ apiKey: ... })` must switch to `createSlackImageEnricher()` (no args) and remove the Anthropic API key from enricher config — the downstream provider already has it. Any custom enrichers built against the old signature must rewrite to return `ContentBlock[]` and accept `EnrichmentContext`.
+
+Only botinabox itself shipped enrichers in 2.8.x — no known public consumers have custom enrichers yet.
+
 ## [2.8.1] — 2026-04-14
 
 ### Added
