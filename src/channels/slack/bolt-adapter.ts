@@ -80,7 +80,11 @@ export class SlackBoltAdapter {
       }
 
       if (inbound.attachments?.length && this.config.attachmentEnrichers) {
-        inbound = await enrichAttachments(inbound, botToken, this.config.attachmentEnrichers);
+        inbound = await enrichAttachments(
+          inbound,
+          { slack: { botToken } },
+          this.config.attachmentEnrichers,
+        );
       }
 
       await hooks.emit('message.inbound', inbound as unknown as Record<string, unknown>);

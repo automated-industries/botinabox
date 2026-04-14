@@ -1,17 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createImageEnricher } from "../image-enricher.js";
+import { createSlackImageEnricher } from "../image-enricher.js";
+import type { EnrichmentContext } from "../types.js";
 
-vi.mock("@anthropic-ai/sdk", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    messages: {
-      create: vi.fn().mockResolvedValue({
-        content: [{ type: "text", text: "A detailed image description." }],
-      }),
-    },
-  })),
-}));
+const ctx: EnrichmentContext = { slack: { botToken: "xoxb-token" } };
 
-describe("createImageEnricher", () => {
+describe("createSlackImageEnricher", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -19,144 +12,85 @@ describe("createImageEnricher", () => {
     vi.clearAllMocks();
   });
 
-  it("downloads image from Slack and sends to Claude vision API", async () => {
+  it("downloads image from Slack and returns a single image ContentBlock", async () => {
     const mockBuffer = Buffer.from("fake-image-data");
     fetchSpy.mockResolvedValueOnce({
       ok: true,
-      arrayBuffer: async () => mockBuffer.buffer,
+      arrayBuffer: async () => mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength),
     } as any);
 
-    const enricher = createImageEnricher({ apiKey: "sk-test" });
+    const enricher = createSlackImageEnricher();
     const result = await enricher({
       type: "image",
       url: "https://files.slack.com/image.jpg",
       mimeType: "image/jpeg",
-    }, "xoxb-token");
+    }, ctx);
 
-    expect(result).toBe("A detailed image description.");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: "image/jpeg",
+        data: mockBuffer.toString("base64"),
+      },
+    });
     expect(fetchSpy).toHaveBeenCalledWith(
       "https://files.slack.com/image.jpg",
       expect.objectContaining({
         headers: { Authorization: "Bearer xoxb-token" },
-      })
+      }),
     );
   });
 
-  it("returns null when URL is missing", async () => {
-    const enricher = createImageEnricher({ apiKey: "sk-test" });
-    const result = await enricher({ type: "image" }, "xoxb-token");
+  it("defaults media_type to image/jpeg when mimeType is missing", async () => {
+    const mockBuffer = Buffer.from("data");
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      arrayBuffer: async () => mockBuffer.buffer.slice(mockBuffer.byteOffset, mockBuffer.byteOffset + mockBuffer.byteLength),
+    } as any);
 
-    expect(result).toBeNull();
+    const enricher = createSlackImageEnricher();
+    const result = await enricher({
+      type: "image",
+      url: "https://files.slack.com/image.bin",
+    }, ctx);
+
+    expect(result[0]).toMatchObject({
+      type: "image",
+      source: { media_type: "image/jpeg" },
+    });
+  });
+
+  it("throws when attachment has no URL", async () => {
+    const enricher = createSlackImageEnricher();
+    await expect(enricher({ type: "image" }, ctx)).rejects.toThrow(/no url/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("returns null when fetch fails with non-ok response", async () => {
-    fetchSpy.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-    } as any);
-
-    const enricher = createImageEnricher({ apiKey: "sk-test" });
-    const result = await enricher({
-      type: "image",
-      url: "https://files.slack.com/missing.jpg",
-    }, "xoxb-token");
-
-    expect(result).toBeNull();
+  it("throws when ctx.slack.botToken is missing", async () => {
+    const enricher = createSlackImageEnricher();
+    await expect(
+      enricher({ type: "image", url: "https://files.slack.com/image.jpg" }, {}),
+    ).rejects.toThrow(/botToken/);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("returns null when fetch throws", async () => {
+  it("throws when fetch returns non-ok", async () => {
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 404 } as any);
+
+    const enricher = createSlackImageEnricher();
+    await expect(
+      enricher({ type: "image", url: "https://files.slack.com/missing.jpg" }, ctx),
+    ).rejects.toThrow(/404/);
+  });
+
+  it("propagates fetch errors", async () => {
     fetchSpy.mockRejectedValueOnce(new Error("Network error"));
 
-    const enricher = createImageEnricher({ apiKey: "sk-test" });
-    const result = await enricher({
-      type: "image",
-      url: "https://files.slack.com/image.jpg",
-    }, "xoxb-token");
-
-    expect(result).toBeNull();
-  });
-
-  it("returns null when Anthropic API throws", async () => {
-    const mockBuffer = Buffer.from("fake-image-data");
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      arrayBuffer: async () => mockBuffer.buffer,
-    } as any);
-
-    const { default: MockAnthropic } = await import("@anthropic-ai/sdk");
-    (MockAnthropic as any).mockImplementationOnce(() => ({
-      messages: {
-        create: vi.fn().mockRejectedValue(new Error("API error")),
-      },
-    }));
-
-    const enricher = createImageEnricher({ apiKey: "sk-test" });
-    const result = await enricher({
-      type: "image",
-      url: "https://files.slack.com/image.jpg",
-    }, "xoxb-token");
-
-    expect(result).toBeNull();
-  });
-
-  it("uses default model when not specified", async () => {
-    const mockBuffer = Buffer.from("fake-image-data");
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      arrayBuffer: async () => mockBuffer.buffer,
-    } as any);
-
-    const { default: MockAnthropic } = await import("@anthropic-ai/sdk");
-    const createSpy = vi.fn().mockResolvedValue({
-      content: [{ type: "text", text: "description" }],
-    });
-    (MockAnthropic as any).mockImplementationOnce(() => ({
-      messages: { create: createSpy },
-    }));
-
-    const enricher = createImageEnricher({ apiKey: "sk-test" });
-    await enricher({
-      type: "image",
-      url: "https://files.slack.com/image.jpg",
-      mimeType: "image/png",
-    }, "xoxb-token");
-
-    expect(createSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "claude-sonnet-4-6",
-      })
-    );
-  });
-
-  it("uses custom model when specified", async () => {
-    const mockBuffer = Buffer.from("fake-image-data");
-    fetchSpy.mockResolvedValueOnce({
-      ok: true,
-      arrayBuffer: async () => mockBuffer.buffer,
-    } as any);
-
-    const { default: MockAnthropic } = await import("@anthropic-ai/sdk");
-    const createSpy = vi.fn().mockResolvedValue({
-      content: [{ type: "text", text: "description" }],
-    });
-    (MockAnthropic as any).mockImplementationOnce(() => ({
-      messages: { create: createSpy },
-    }));
-
-    const enricher = createImageEnricher({
-      apiKey: "sk-test",
-      model: "claude-opus-4",
-    });
-    await enricher({
-      type: "image",
-      url: "https://files.slack.com/image.jpg",
-    }, "xoxb-token");
-
-    expect(createSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "claude-opus-4",
-      })
-    );
+    const enricher = createSlackImageEnricher();
+    await expect(
+      enricher({ type: "image", url: "https://files.slack.com/image.jpg" }, ctx),
+    ).rejects.toThrow("Network error");
   });
 });

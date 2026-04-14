@@ -1,91 +1,36 @@
 import type { Attachment } from "../../../shared/types/channel.js";
+import type { ContentBlock } from "../../../shared/types/provider.js";
 import type { AttachmentEnricher } from "./types.js";
 
-export interface ImageEnricherConfig {
-  /** Anthropic API key for vision calls. */
-  apiKey: string;
-  /** Model to use. Defaults to claude-sonnet-4-6. */
-  model?: string;
-  /** Max tokens for the description. Defaults to 1024. */
-  maxTokens?: number;
-  /** Prompt used for image description. */
-  prompt?: string;
-}
-
-const DEFAULT_PROMPT =
-  "Describe this image in detail. Include any visible text (OCR), objects, people, layout, and context. Be thorough — the description will be used as input to another agent that cannot see the image.";
-
 /**
- * Download a Slack file via authenticated GET.
- * Returns the file as a base64 string, or null on failure.
+ * Slack image enricher. Downloads the image via the Slack bot token and
+ * returns a single `image` ContentBlock containing the base64 data. No
+ * intermediate vision API call — the downstream Anthropic provider sees
+ * the raw image and processes it natively.
+ *
+ * Consumers wire this as `attachmentEnrichers.image = createSlackImageEnricher()`.
  */
-async function downloadAsBase64(urlPrivate: string, botToken: string): Promise<string | null> {
-  try {
-    const response = await fetch(urlPrivate, {
-      headers: { Authorization: `Bearer ${botToken}` },
+export function createSlackImageEnricher(): AttachmentEnricher {
+  return async (att: Attachment, ctx): Promise<ContentBlock[]> => {
+    if (!att.url) throw new Error("image enricher: attachment has no url");
+    if (!ctx.slack?.botToken) throw new Error("image enricher: ctx.slack.botToken required");
+
+    const response = await fetch(att.url, {
+      headers: { Authorization: `Bearer ${ctx.slack.botToken}` },
       signal: AbortSignal.timeout(30000),
     });
-    if (!response.ok) return null;
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return buffer.toString("base64");
-  } catch {
-    return null;
-  }
-}
+    if (!response.ok) throw new Error(`slack download failed: ${response.status}`);
 
-/**
- * Build an enricher that sends Slack-hosted images to Claude's vision API
- * and returns a text description.
- *
- * Consumer must provide an Anthropic API key. The Anthropic SDK is a peer
- * dependency of botinabox — the consumer must have it installed.
- */
-export function createImageEnricher(config: ImageEnricherConfig): AttachmentEnricher {
-  const { apiKey, model = "claude-sonnet-4-6", maxTokens = 1024, prompt = DEFAULT_PROMPT } = config;
-
-  return async (att: Attachment, botToken: string): Promise<string | null> => {
-    if (!att.url) return null;
-    const mediaType = att.mimeType ?? "image/jpeg";
-
-    const base64 = await downloadAsBase64(att.url, botToken);
-    if (!base64) return null;
-
-    // Dynamic import — @anthropic-ai/sdk is a peer dep
-    const anthropicModule = "@anthropic-ai/sdk";
-    const sdk = await (import(anthropicModule) as Promise<{
-      default: new (config: { apiKey: string }) => {
-        messages: {
-          create(params: Record<string, unknown>): Promise<{
-            content: Array<{ type: string; text?: string }>;
-          }>;
-        };
-      };
-    }>);
-
-    const client = new sdk.default({ apiKey });
-
-    try {
-      const message = await client.messages.create({
-        model,
-        max_tokens: maxTokens,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: mediaType, data: base64 },
-              },
-              { type: "text", text: prompt },
-            ],
-          },
-        ],
-      });
-
-      const textBlock = message.content.find((c) => c.type === "text");
-      return textBlock?.text ?? null;
-    } catch {
-      return null;
-    }
+    const base64 = Buffer.from(await response.arrayBuffer()).toString("base64");
+    return [
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: att.mimeType ?? "image/jpeg",
+          data: base64,
+        },
+      },
+    ];
   };
 }
