@@ -1,52 +1,62 @@
 import type { InboundMessage } from "../../../shared/types/channel.js";
-import type { AttachmentEnricherMap } from "./types.js";
+import type { ContentBlock } from "../../../shared/types/provider.js";
+import type { AttachmentEnricherMap, EnrichmentContext } from "./types.js";
 
 /**
- * Run enrichers over each attachment on an InboundMessage and append extracted
- * content to the message body.
+ * Run enrichers over each attachment on an InboundMessage. Text blocks get
+ * appended to `body`; image/document blocks get stored on `attachmentBlocks`
+ * so ChatPipeline can assemble a multimodal user message.
  *
- * Enrichers are run sequentially. If an enricher throws or returns null, the
- * attachment is surfaced as `[Attached: <filename>]` with no content — the
- * LLM still sees that a file was present.
- *
- * Extracted text is appended to the body in this format:
- *
- *     <original body>
- *
- *     [Attached: invoice.pdf]
- *     <extracted content>
+ * Enrichers that throw or return empty arrays fall back to a plain
+ * `[Attached: <filename>]` breadcrumb — the LLM still sees the attachment
+ * was there, just without content.
  */
 export async function enrichAttachments(
   msg: InboundMessage,
-  botToken: string,
+  ctx: EnrichmentContext,
   enrichers: AttachmentEnricherMap,
 ): Promise<InboundMessage> {
   if (!msg.attachments?.length) return msg;
 
-  const parts: string[] = msg.body ? [msg.body] : [];
+  const textParts: string[] = msg.body ? [msg.body] : [];
+  const mediaBlocks: ContentBlock[] = [];
 
   for (const att of msg.attachments) {
     const enricher = enrichers[att.type];
     const label = att.filename ?? att.url ?? att.type;
 
     if (!enricher) {
-      parts.push(`[Attached: ${label}]`);
+      textParts.push(`[Attached: ${label}]`);
       continue;
     }
 
-    let extracted: string | null = null;
+    let blocks: ContentBlock[];
     try {
-      extracted = await enricher(att, botToken);
+      blocks = await enricher(att, ctx);
     } catch {
-      extracted = null;
+      textParts.push(`[Attached: ${label}]`);
+      continue;
     }
 
-    if (extracted) {
-      parts.push(`[Attached: ${label}]\n${extracted}`);
-    } else {
-      parts.push(`[Attached: ${label}]`);
+    if (blocks.length === 0) {
+      textParts.push(`[Attached: ${label}]`);
+      continue;
+    }
+
+    for (const block of blocks) {
+      if (block.type === "text") {
+        textParts.push(`[Attached: ${label}]\n${block.text}`);
+      } else if (block.type === "image" || block.type === "document") {
+        mediaBlocks.push(block);
+        textParts.push(`[Attached: ${label}]`);
+      }
+      // tool_use / tool_result blocks are never valid enricher output — drop silently
     }
   }
 
-  return { ...msg, body: parts.join("\n\n") };
+  return {
+    ...msg,
+    body: textParts.join("\n\n"),
+    attachmentBlocks: mediaBlocks.length > 0 ? mediaBlocks : undefined,
+  };
 }
