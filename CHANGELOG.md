@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.7.9] — 2026-04-14
+
+### Changed
+- **`latticesql` bumped to `^1.6.9`** — picks up json_extract polyfill.
+
 ## [2.7.8] — 2026-04-14
 
 ### Changed
