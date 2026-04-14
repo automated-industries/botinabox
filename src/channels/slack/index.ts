@@ -15,3 +15,5 @@ export type { SlackConfig } from "./models.js";
 export { SlackBoltAdapter } from "./bolt-adapter.js";
 export type { SlackBoltAdapterConfig } from "./bolt-adapter.js";
 export { default } from "./adapter.js";
+
+export * from "./enrichers/index.js";
