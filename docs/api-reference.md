@@ -152,7 +152,7 @@ const runs = new RunManager(db, hooks);
 | `getStaleRuns(thresholdMs?)` | `Promise<Row[]>` | Find runs exceeding threshold |
 | `reapOrphanRuns(thresholdMs?)` | `Promise<number>` | Fail orphaned runs; returns count |
 
-**finishRun result:** `{ exitCode: number; output?: string; costCents?: number; usage?: { inputTokens, outputTokens } }`
+**finishRun result:** `{ exitCode: number; output?: string; costCents?: number; usage?: { inputTokens, outputTokens }; model?: string; provider?: string }`
 
 On success (`exitCode: 0`): marks task `done`, creates followup task if `followupAgentId` set.
 On failure with retries remaining: schedules retry with exponential backoff.

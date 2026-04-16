@@ -58,6 +58,8 @@ export class RunManager {
       output?: string;
       costCents?: number;
       usage?: unknown;
+      model?: string;
+      provider?: string;
     },
   ): Promise<void> {
     const run = await this.db.get('runs', { id: runId });
@@ -75,6 +77,7 @@ export class RunManager {
       input_tokens: usage?.['inputTokens'] ?? 0,
       output_tokens: usage?.['outputTokens'] ?? 0,
       error_message: result.exitCode !== 0 ? result.output : undefined,
+      model: result.model ?? undefined,
     });
 
     // Release lock
@@ -167,6 +170,9 @@ export class RunManager {
       taskId,
       status,
       exitCode: result.exitCode,
+      model: result.model,
+      provider: result.provider,
+      usage: result.usage,
     });
   }
 
