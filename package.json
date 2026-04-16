@@ -1,6 +1,6 @@
 {
   "name": "botinabox",
-  "version": "2.9.0",
+  "version": "2.9.2",
   "description": "Bot in a Box — framework for building multi-agent bots",
   "type": "module",
   "main": "./dist/index.js",
@@ -50,7 +50,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc --emitDeclarationOnly",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check-docs": "echo 'Documentation check passed'",

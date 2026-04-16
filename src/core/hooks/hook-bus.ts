@@ -67,6 +67,55 @@ export class HookBus {
     }
   }
 
+  /**
+   * Emit an event and collect handler errors instead of swallowing them.
+   * Handlers still run in priority order and one handler's error does not
+   * block subsequent handlers. Returns the array of errors (empty = success).
+   */
+  async emitCollectingErrors(
+    event: string,
+    context: Record<string, unknown>,
+  ): Promise<Error[]> {
+    const list = this.registrations.get(event);
+    if (!list || list.length === 0) return [];
+
+    const snapshot = [...list];
+    const toRemove: HookRegistration[] = [];
+    const errors: Error[] = [];
+
+    for (const reg of snapshot) {
+      if (reg.filter) {
+        const matches = Object.entries(reg.filter).every(
+          ([k, v]) => context[k] === v,
+        );
+        if (!matches) continue;
+      }
+
+      try {
+        await reg.handler(context);
+      } catch (err) {
+        const wrapped =
+          err instanceof Error ? err : new Error(String(err));
+        errors.push(wrapped);
+        console.error(
+          `[HookBus] Handler error on event "${event}":`,
+          err,
+        );
+      }
+
+      if (reg.once) toRemove.push(reg);
+    }
+
+    for (const r of toRemove) {
+      const arr = this.registrations.get(event);
+      if (!arr) continue;
+      const idx = arr.indexOf(r);
+      if (idx !== -1) arr.splice(idx, 1);
+    }
+
+    return errors;
+  }
+
   /** Emit synchronously (use only when async is not needed) */
   emitSync(event: string, context: Record<string, unknown>): void {
     const list = this.registrations.get(event);
