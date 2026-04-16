@@ -204,7 +204,7 @@ export class ChatPipelineV2 {
 
       // Resolve stable thread ID (same DM logic as v1)
       const channelId = msg.account ?? '';
-      const threadTs = channelId || msg.threadId || msg.id;
+      const threadTs = msg.threadId || channelId || msg.id;
 
       if (threadTs && channelId) {
         this.threadChannelMap.set(threadTs, channelId);
@@ -218,7 +218,7 @@ export class ChatPipelineV2 {
 
       try {
         // Build conversation history
-        const history = await this.buildHistory(channelId);
+        const history = await this.buildHistory(threadTs);
 
         // Build system context from DB
         let systemPrompt = this.config.systemPrompt;
@@ -410,10 +410,10 @@ export class ChatPipelineV2 {
   }
 
   /**
-   * Build conversation history from channel messages.
+   * Build conversation history from thread messages.
    * Includes BOTH user and assistant messages (unlike v1 which excluded bot messages).
    */
-  private async buildHistory(channelId: string): Promise<MessageParam[]> {
+  private async buildHistory(threadTs: string): Promise<MessageParam[]> {
     const maxMessages = this.config.history?.maxMessages ?? DEFAULT_MAX_MESSAGES;
     const maxAgeDays = this.config.history?.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS;
     const includeAssistant = this.config.history?.includeAssistant !== false;
@@ -423,7 +423,7 @@ export class ChatPipelineV2 {
     let rows: Array<Record<string, unknown>>;
     try {
       rows = await this.db.query('messages', {
-        where: { channel: this.channel },
+        where: { thread_id: threadTs },
         orderBy: 'created_at',
         orderDir: 'desc',
         limit: maxMessages,

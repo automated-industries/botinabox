@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.3] — 2026-04-15
+
+### Fixed
+
+- **Channel thread replies post at channel top instead of threaded** — `ChatPipelineV2` resolved `threadTs` as `channelId || msg.threadId || msg.id`, so `msg.threadId` (the real thread timestamp) was never reached for channel messages because `channelId` (the `C_XXXXX` channel ID) is always truthy. Fixed priority to `msg.threadId || channelId || msg.id`. DM behavior is preserved since top-level DMs have no `threadId`.
+- **`buildHistory` pulled messages from all threads** — The history query filtered by `channel: 'slack'` (the pipeline channel name), returning messages from every thread indiscriminately. Changed to query by `thread_id` so each thread gets its own isolated conversation history.
+
 ## [2.9.2] — 2026-04-15
 
 ### Fixed
