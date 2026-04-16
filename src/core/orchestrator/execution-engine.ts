@@ -224,6 +224,8 @@ export async function registerExecutionEngine(opts: {
         output: finalOutput,
         costCents,
         usage: { inputTokens: totalInput, outputTokens: totalOutput },
+        model,
+        provider: 'anthropic',
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

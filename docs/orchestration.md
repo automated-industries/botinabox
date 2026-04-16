@@ -261,8 +261,10 @@ await runs.finishRun(runId, {
   output: 'Analysis complete. Key findings: ...',
   costCents: 12,
   usage: { inputTokens: 5000, outputTokens: 2000 },
+  model: 'claude-sonnet-4-20250514',   // Written to runs.model
+  provider: 'anthropic',               // Forwarded to run.completed hook
 });
-// Emits: 'run.completed' { runId, agentId, taskId, status, exitCode }
+// Emits: 'run.completed' { runId, agentId, taskId, status, exitCode, model, provider, usage }
 ```
 
 ### Retry with Exponential Backoff
@@ -1331,7 +1333,7 @@ Here is the complete lifecycle of a task from creation to completion:
    └── CLI: spawns subprocess, captures output
 
 5. RunManager.finishRun()
-   ├── Updates run record (status, cost, tokens)
+   ├── Updates run record (status, cost, tokens, model)
    ├── Releases agent lock
    │
    ├── On SUCCESS (exitCode 0):
