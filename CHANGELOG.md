@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.5] — 2026-04-16
+
+### Added
+
+- **Model tracking in `finishRun()`.** `RunManager.finishRun()` now accepts optional `model` and `provider` fields. When provided, `model` is written to the `runs` table row and both `model`, `provider`, and `usage` are forwarded in the `run.completed` hook payload. This unblocks the cost tracker (`setupCostTracker`) which previously returned early because model/provider were never present in the hook event.
+
+- **Execution engine passes model to `finishRun()`.** The built-in API execution engine (`registerExecutionEngine`) now includes the resolved model name and `provider: 'anthropic'` in every `finishRun()` call, so `runs.model` and `cost_events` are populated automatically for all API-adapter agents.
+
 ## [2.9.4] — 2026-04-16
 
 ### Fixed
