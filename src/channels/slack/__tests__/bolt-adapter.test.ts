@@ -117,6 +117,39 @@ describe('SlackBoltAdapter — thread_ts forwarding', () => {
       );
     });
 
+    it('omits thread_ts when threadId looks like a Slack channel id', async () => {
+      await startAdapter();
+      const handler = registeredHooks['response.ready'];
+
+      await handler({ threadId: 'D01234567AB', text: 'Hello', taskId: undefined });
+
+      expect(postMessageSpy).toHaveBeenCalledWith(
+        expect.not.objectContaining({ thread_ts: expect.anything() }),
+      );
+    });
+
+    it('omits thread_ts when threadId is a client_msg_id UUID', async () => {
+      await startAdapter();
+      const handler = registeredHooks['response.ready'];
+
+      await handler({ threadId: 'abc-123-def-456', text: 'Hello', taskId: undefined });
+
+      expect(postMessageSpy).toHaveBeenCalledWith(
+        expect.not.objectContaining({ thread_ts: expect.anything() }),
+      );
+    });
+
+    it('omits thread_ts when threadId is a number', async () => {
+      await startAdapter();
+      const handler = registeredHooks['response.ready'];
+
+      await handler({ threadId: 34000000, text: 'Hello', taskId: undefined });
+
+      expect(postMessageSpy).toHaveBeenCalledWith(
+        expect.not.objectContaining({ thread_ts: expect.anything() }),
+      );
+    });
+
     it('does not call postMessage when text is empty', async () => {
       await startAdapter();
       const handler = registeredHooks['response.ready'];
