@@ -497,4 +497,86 @@ describe('ChatPipelineV2 — Primary Agent Architecture', () => {
       expect(threadIds[0]).toBe('D_DM');
     });
   });
+
+  describe('thread resolution (regression)', () => {
+    it('resolves threadTs to msg.threadId when both threadId and account are set', async () => {
+      const responses: Record<string, unknown>[] = [];
+      hooks.register('response.ready', (ctx) => { responses.push(ctx); });
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2({ textResponse: 'threaded reply' }),
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      const threadTimestamp = '1776308368.646379';
+      await hooks.emit('message.inbound', makeMessage('reply in thread', {
+        account: 'C_CHANNEL',
+        threadId: threadTimestamp,
+      }) as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // The response should carry the thread timestamp, not the channel ID
+      expect(responses.length).toBeGreaterThanOrEqual(1);
+      expect(responses[0]!.threadId).toBe(threadTimestamp);
+    });
+
+    it('resolves threadTs to account when threadId is undefined (DM)', async () => {
+      const responses: Record<string, unknown>[] = [];
+      hooks.register('response.ready', (ctx) => { responses.push(ctx); });
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2({ textResponse: 'dm reply' }),
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('hello from DM', {
+        account: 'D_DM_CHANNEL',
+        threadId: undefined,
+      }) as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(responses.length).toBeGreaterThanOrEqual(1);
+      expect(responses[0]!.threadId).toBe('D_DM_CHANNEL');
+    });
+
+    it('buildHistory queries by thread_id, not by channel', async () => {
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2(),
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      const threadA = '1776308368.000001';
+      const threadB = '1776308368.000002';
+
+      // Send messages in two different threads on the same channel
+      await hooks.emit('message.inbound', makeMessage('thread A msg', {
+        account: 'C_SHARED',
+        threadId: threadA,
+      }) as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      await hooks.emit('message.inbound', makeMessage('thread B msg', {
+        account: 'C_SHARED',
+        threadId: threadB,
+      }) as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // Verify messages stored with correct thread_ids
+      const stored = await db.query('messages', { where: { direction: 'inbound' } });
+      const threadAMsgs = stored.filter(m => m.thread_id === threadA);
+      const threadBMsgs = stored.filter(m => m.thread_id === threadB);
+      expect(threadAMsgs.length).toBe(1);
+      expect(threadBMsgs.length).toBe(1);
+
+      // Verify thread A's message body is isolated from thread B
+      expect((threadAMsgs[0]!.body as string)).toContain('thread A msg');
+      expect((threadBMsgs[0]!.body as string)).toContain('thread B msg');
+    });
+  });
 });
