@@ -3,6 +3,8 @@
  * 20 tools across 6 modules. All channel-agnostic.
  */
 
+import type { ToolDefinition, ToolHandler } from '../execution-engine.js';
+
 // File operations
 import { sendFileTool } from './send-file.js';
 import { readFileTool } from './read-file.js';
@@ -74,3 +76,36 @@ export const coordinatorTools = [
   // Awareness (for routing decisions, not for doing work)
   listFilesTool, listProjectsTool, sendFileTool,
 ];
+
+export type Tool = { definition: ToolDefinition; handler: ToolHandler };
+
+/**
+ * Merge multiple tool sets into a single array with unique names.
+ * Later tool sets override earlier ones — consumer tools win over built-ins.
+ * Logs a warning on each override so the collision is visible in logs.
+ */
+export function mergeTools(
+  ...toolSets: ReadonlyArray<ReadonlyArray<Tool>>
+): Tool[] {
+  const seen = new Map<string, number>();
+  const result: Tool[] = [];
+
+  for (const set of toolSets) {
+    for (const tool of set) {
+      const name = tool.definition.name;
+      const existing = seen.get(name);
+      if (existing !== undefined) {
+        result[existing] = tool;
+        console.warn(
+          `[mergeTools] tool '${name}' overridden by a later tool set -- ` +
+          `the earlier definition will not be used`,
+        );
+      } else {
+        seen.set(name, result.length);
+        result.push(tool);
+      }
+    }
+  }
+
+  return result;
+}

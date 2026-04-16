@@ -12,6 +12,7 @@ import cronParser from "cron-parser";
 import { v4 as uuid } from "uuid";
 import type { DataStore } from "../data/data-store.js";
 import type { HookBus } from "../hooks/hook-bus.js";
+import type { CircuitBreaker } from "./circuit-breaker.js";
 
 export interface ScheduleDef {
   name: string;
@@ -59,11 +60,17 @@ function computeNextFire(
 
 export class Scheduler {
   private timer: ReturnType<typeof setInterval> | null = null;
+  private breaker?: CircuitBreaker;
 
   constructor(
     private db: DataStore,
     private hooks: HookBus,
   ) {}
+
+  /** Wire a CircuitBreaker for connector.sync actions. */
+  setCircuitBreaker(cb: CircuitBreaker): void {
+    this.breaker = cb;
+  }
 
   /**
    * Start the scheduler. Computes initial next_fire_at for schedules
@@ -108,12 +115,71 @@ export class Scheduler {
           if (!k.startsWith('__')) safeConfig[k] = v;
         }
 
-        // Emit the action hook (e.g. 'connector.sync', 'channel.send')
-        await this.hooks.emit(schedule.action, {
-          schedule_id: schedule.id,
-          schedule_name: schedule.name,
-          ...safeConfig,
-        });
+        // Circuit breaker gate for connector.sync actions.
+        // Key is the connector type + account (e.g., "gmail:alice@example.com").
+        const breakerKey =
+          schedule.action === "connector.sync" && this.breaker
+            ? `${safeConfig["connector"]}:${safeConfig["account"]}`
+            : null;
+
+        if (breakerKey && !this.breaker!.canExecute(breakerKey)) {
+          console.warn(
+            `[Scheduler] circuit open for ${breakerKey}, skipping sync`,
+          );
+          continue;
+        }
+
+        // Emit the action hook (e.g. 'connector.sync', 'channel.send').
+        // Use emitCollectingErrors so handler failures are visible to the
+        // circuit breaker (HookBus.emit swallows errors by design).
+        const handlerErrors = await this.hooks.emitCollectingErrors(
+          schedule.action,
+          {
+            schedule_id: schedule.id,
+            schedule_name: schedule.name,
+            ...safeConfig,
+          },
+        );
+
+        if (handlerErrors.length > 0) {
+          // At least one handler failed — record for circuit breaker
+          if (breakerKey) {
+            await this.breaker!.recordFailure(
+              breakerKey,
+              handlerErrors[0]!.message,
+            );
+          }
+          // Emit schedule.error for observability
+          await this.hooks.emit("schedule.error", {
+            schedule_id: schedule.id,
+            schedule_name: schedule.name,
+            error: handlerErrors[0]!.message,
+          });
+          console.error(
+            `[Scheduler] Handler error firing "${schedule.name}":`,
+            handlerErrors[0],
+          );
+          // Skip success path — do NOT update last_fired_at
+          // Still recompute next_fire_at so the schedule keeps ticking
+          if (schedule.type === "recurring" && schedule.cron) {
+            const nextFire = computeNextFire(
+              schedule.cron,
+              schedule.timezone,
+              new Date(),
+            );
+            await this.db.update(
+              "schedules",
+              { id: schedule.id },
+              { next_fire_at: nextFire, updated_at: now },
+            );
+          }
+          continue;
+        }
+
+        // Record success for circuit breaker
+        if (breakerKey) {
+          await this.breaker!.recordSuccess(breakerKey);
+        }
 
         // Emit observability hook
         await this.hooks.emit("schedule.fired", {

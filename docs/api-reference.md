@@ -198,10 +198,28 @@ const scheduler = new Scheduler(db, hooks);
 | `start(pollIntervalMs?)` | `Promise<void>` | Start polling for due schedules |
 | `stop()` | `void` | Stop polling |
 | `tick()` | `Promise<void>` | Manually check and fire due schedules |
+| `setCircuitBreaker(cb)` | `void` | Wire a CircuitBreaker for `connector.sync` actions |
 
 **ScheduleDef:** `{ name, cron?, runAt?, action, actionConfig?, timezone?, description? }`
 
 When a schedule fires, the scheduler emits `hooks.emit(schedule.action, schedule.actionConfig)`.
+
+---
+
+### mergeTools
+
+Safely combine tool arrays with deduplication. Later tool sets override earlier ones.
+
+```typescript
+import { nativeTools, mergeTools } from 'botinabox';
+const tools = mergeTools(nativeTools, gmailSkills, pdfSkills);
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `...toolSets` | `ReadonlyArray<Tool>[]` | Tool arrays to merge (last wins on name collision) |
+
+Returns `Tool[]`. Logs a warning on each override.
 
 ---
 

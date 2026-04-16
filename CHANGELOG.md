@@ -6,6 +6,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.2] — 2026-04-15
+
+### Fixed
+
+- **DTS build no longer OOMs on Windows.** Switched from tsup's built-in DTS worker (which runs in a memory-limited worker thread) to `tsc --emitDeclarationOnly` in the main process. ESM bundling still uses tsup.
+
+### Added
+
+- **`mergeTools()` utility** — safely combines multiple tool arrays with deduplication. Later tool sets override earlier ones (last-wins), logging a warning on each override. Prevents the Anthropic API 400 "Tool names must be unique" error that occurred when consumers concatenated `nativeTools` with local tools sharing a name. Import from `'botinabox'` alongside `nativeTools`.
+
+- **`Scheduler.setCircuitBreaker()`** — wires the existing `CircuitBreaker` into the scheduler's `connector.sync` path. After 3 consecutive failures for a connector key (e.g., `gmail:alice@example.com`), the circuit opens and skips all syncs for that key until the cooldown expires. Prevents retry storms from saturating the event loop when a connector is persistently broken.
+
+- **`HookBus.emitCollectingErrors()`** — variant of `emit()` that returns handler errors instead of swallowing them. Handlers still run in priority order with error isolation. Used internally by the Scheduler to detect connector sync failures without changing `emit()` semantics.
+
+## [2.9.1] — 2026-04-14
+
+### Fixed
+
+- **Slack `thread_ts` now validated before forwarding.** The `response.ready` and `file.deliver` hook handlers in `SlackBoltAdapter` previously forwarded any truthy `ctx.threadId` as Slack's `thread_ts` field. Upstream callers sometimes populate `threadId` from a conversation identifier that can be a channel id, a `client_msg_id` UUID, or another non-`ts` value — in which case Slack's Web API rejects `chat.postMessage` with `invalid_thread_ts` and the response never reaches the user. A regex guard (`/^\d+\.\d+$/`) now ensures only values matching a real Slack thread timestamp are forwarded; anything else is omitted so the reply posts at the top of the channel.
+
 ## [2.9.0] — 2026-04-14
 
 ### Changed (breaking)
