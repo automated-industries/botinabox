@@ -63,7 +63,12 @@ export function parseSlackEvent(event: SlackEvent): InboundMessage {
   const id = event.client_msg_id ?? event.ts ?? event.event_ts ?? `slack-${Date.now()}`;
   const channel = event.channel ?? "unknown";
   const from = event.user ?? "unknown";
-  const threadId = event.thread_ts !== undefined ? event.thread_ts : undefined;
+  // For thread replies, use thread_ts (the parent message's ts).
+  // For top-level channel messages (C/G prefix), use the message's own ts —
+  // it IS the thread root that future replies will reference via thread_ts.
+  // For DMs (D prefix), leave undefined so the pipeline groups by channel ID.
+  const isChannel = channel.startsWith('C') || channel.startsWith('G');
+  const threadId = event.thread_ts ?? (isChannel ? event.ts : undefined);
   const receivedAt = event.ts
     ? new Date(parseFloat(event.ts) * 1000).toISOString()
     : new Date().toISOString();

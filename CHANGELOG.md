@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.4] — 2026-04-16
+
+### Fixed
+
+- **Channel threads have no conversation context** — `parseSlackEvent` only set `threadId` when `thread_ts` was present (thread replies), leaving it `undefined` for top-level channel messages. The pipeline then stored top-level messages under the channel ID (`C_XXXXX`) as `thread_id`, but thread replies stored under the actual thread timestamp. Result: `buildHistory` for a thread reply found zero prior messages because the IDs didn't match. Fix: for top-level channel messages (C/G prefix), set `threadId = event.ts` (the message's own timestamp) — this is the value Slack will use as `thread_ts` for future replies, so all messages in a thread now share the same `thread_id`. DM behavior unchanged (top-level DMs leave `threadId` undefined so the pipeline groups by channel ID).
+
 ## [2.9.3] — 2026-04-15
 
 ### Fixed
