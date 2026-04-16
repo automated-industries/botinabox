@@ -20,6 +20,19 @@ import { chunkText } from '../../core/chat/text-chunker.js';
 import type { AttachmentEnricherMap } from './enrichers/types.js';
 import { enrichAttachments } from './enrichers/enrich.js';
 
+/**
+ * Slack thread timestamps have the shape `XXXXXXXXXX.XXXXXX` — the original
+ * message `ts` of the thread root. Upstream callers sometimes hand us a
+ * channel id, a client_msg_id UUID, or a conversation identifier instead,
+ * because internal pipeline logic conflates "thread id" with "conversation
+ * id". Only forward values that actually parse as a Slack ts; otherwise
+ * omit `thread_ts` so the reply posts at the top of the channel.
+ */
+const SLACK_TS_RE = /^\d+\.\d+$/;
+function isValidSlackThreadTs(value: unknown): value is string {
+  return typeof value === 'string' && SLACK_TS_RE.test(value);
+}
+
 // Minimal Bolt App interface — avoids @slack/bolt as compile-time dependency
 interface BoltApp {
   event(name: string, handler: (args: { event: Record<string, unknown> }) => Promise<void>): void;
@@ -107,7 +120,7 @@ export class SlackBoltAdapter {
           token: botToken,
           channel: channelId,
           text: chunk,
-          ...(threadId ? { thread_ts: threadId } : {}),
+          ...(isValidSlackThreadTs(threadId) ? { thread_ts: threadId } : {}),
         });
       }
     }, { priority: 90 });
@@ -132,7 +145,7 @@ export class SlackBoltAdapter {
             file: createReadStream(filePath),
             filename: basename(filePath),
             title: fileName ?? basename(filePath),
-            ...(threadId ? { thread_ts: threadId } : {}),
+            ...(isValidSlackThreadTs(threadId) ? { thread_ts: threadId } : {}),
           });
         }
       } catch {

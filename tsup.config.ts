@@ -13,6 +13,6 @@ export default defineConfig({
     'cli': 'src/cli.ts',
   },
   format: ['esm'],
-  dts: true,
+  dts: false, // declarations generated separately via tsc --emitDeclarationOnly
   target: 'es2022',
 });
