@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { formatContextFilesBlock, type ContextFile } from '../execution-engine.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { formatContextFilesBlock, type ContextFile, registerExecutionEngine } from '../execution-engine.js';
+import { DataStore } from '../../data/data-store.js';
+import { HookBus } from '../../hooks/hook-bus.js';
+import { defineCoreTables } from '../../data/core-schema.js';
+import { RunManager } from '../run-manager.js';
 
 describe('formatContextFilesBlock', () => {
   it('returns empty string for undefined input', () => {
@@ -58,5 +62,102 @@ describe('formatContextFilesBlock', () => {
       { path: '/x.md', content: '  spaced  ' },
     ]);
     expect(out).toBe('<file path="/x.md">\n  spaced  \n</file>');
+  });
+});
+
+describe('registerExecutionEngine — resolveModel', () => {
+  let db: DataStore;
+  let hooks: HookBus;
+  let runs: RunManager;
+
+  beforeEach(async () => {
+    db = new DataStore({ dbPath: ':memory:' });
+    defineCoreTables(db);
+    await db.init();
+    hooks = new HookBus();
+    runs = new RunManager(db, hooks);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it('uses resolveModel return value as the model for the LLM call', async () => {
+    // Seed agent and task
+    await db.insert('agents', { id: 'a1', slug: 'search-agent', name: 'Search', role: 'search', adapter: 'api' });
+    await db.insert('tasks', { id: 't1', title: 'Find files', assignee_id: 'a1', status: 'todo' });
+
+    let capturedModel: string | undefined;
+    const mockClient = {
+      messages: {
+        create: async (params: Record<string, unknown>) => {
+          capturedModel = params.model as string;
+          return {
+            content: [{ type: 'text', text: 'Found 3 files' }],
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 10, output_tokens: 5 },
+          };
+        },
+      },
+    };
+
+    await registerExecutionEngine({
+      db, hooks, runs,
+      config: {
+        client: mockClient,
+        model: 'claude-sonnet-4-20250514',
+        includeSystemContext: false,
+        resolveModel: ({ agent }) => {
+          if (agent.role === 'search') return 'claude-haiku-4-5-20251001';
+          return undefined; // fall back to global
+        },
+      },
+    });
+
+    // Emit task.created to trigger execution
+    await hooks.emit('task.created', { id: 't1' });
+
+    // Wait for async execution
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(capturedModel).toBe('claude-haiku-4-5-20251001');
+
+    // Verify the model was recorded in the run
+    const completedRuns = await db.query('runs', { where: { task_id: 't1' } });
+    expect(completedRuns[0]?.['model']).toBe('claude-haiku-4-5-20251001');
+  });
+
+  it('falls back to global model when resolveModel returns undefined', async () => {
+    await db.insert('agents', { id: 'a2', slug: 'engineer', name: 'Engineer', role: 'engineer', adapter: 'api' });
+    await db.insert('tasks', { id: 't2', title: 'Build feature', assignee_id: 'a2', status: 'todo' });
+
+    let capturedModel: string | undefined;
+    const mockClient = {
+      messages: {
+        create: async (params: Record<string, unknown>) => {
+          capturedModel = params.model as string;
+          return {
+            content: [{ type: 'text', text: 'Done' }],
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 10, output_tokens: 5 },
+          };
+        },
+      },
+    };
+
+    await registerExecutionEngine({
+      db, hooks, runs,
+      config: {
+        client: mockClient,
+        model: 'claude-sonnet-4-20250514',
+        includeSystemContext: false,
+        resolveModel: () => undefined,
+      },
+    });
+
+    await hooks.emit('task.created', { id: 't2' });
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(capturedModel).toBe('claude-sonnet-4-20250514');
   });
 });
