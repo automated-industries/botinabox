@@ -739,6 +739,23 @@ const syncs = await scheduler.list({ action: 'connector.sync' });
 | `schedule.fired` | `{ schedule_id, schedule_name, action, fired_at }` | After any schedule fires |
 | `schedule.error` | `{ schedule_id, schedule_name, error }` | Schedule handler throws |
 
+### Circuit Breaker for Connector Syncs
+
+Wire a `CircuitBreaker` into the scheduler to prevent retry storms when a connector is persistently broken. After the failure threshold, the circuit opens and skips all syncs for that connector key until the cooldown expires.
+
+```typescript
+import { Scheduler, CircuitBreaker } from 'botinabox';
+
+const scheduler = new Scheduler(db, hooks);
+const breaker = new CircuitBreaker(db, hooks, {
+  failureThreshold: 3,      // Trip after 3 consecutive failures
+  resetTimeoutMs: 300_000,  // 5-minute cooldown before probe
+});
+scheduler.setCircuitBreaker(breaker);
+```
+
+The breaker key is `connector:account` (e.g., `gmail:alice@example.com`), derived from `actionConfig.connector` and `actionConfig.account`. Only `connector.sync` actions are circuit-checked — other scheduled actions bypass the breaker.
+
 ## 8. SessionManager
 
 Manages per-agent/channel/peer session state for maintaining conversation context.
