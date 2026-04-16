@@ -93,7 +93,9 @@ describe("parseSlackEvent — Story 4.5", () => {
     expect(msg.channel).toBe("C123");
     expect(msg.from).toBe("U456");
     expect(msg.body).toBe("Hello world");
-    expect(msg.threadId).toBeUndefined();
+    // Channel messages (C prefix) use their own ts as threadId —
+    // it becomes the thread_ts for future replies
+    expect(msg.threadId).toBe("1617000000.000001");
   });
 
   it("parses thread_ts when present", async () => {
