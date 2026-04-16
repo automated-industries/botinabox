@@ -79,6 +79,21 @@ export interface ExecutionEngineConfig {
   resolveContextFiles?: (
     ctx: { agent: Record<string, unknown>; task: Record<string, unknown> },
   ) => Promise<ContextFile[]> | ContextFile[];
+  /**
+   * Optional per-dispatch model resolver. Called once per task pickup with
+   * the resolved agent and task rows. Returns the model ID string to use
+   * for this specific task's LLM calls.
+   *
+   * When provided, the returned value overrides `config.model` for this
+   * dispatch only. When absent or when the resolver returns undefined,
+   * the global `config.model` is used as before.
+   *
+   * Use this to implement per-agent, per-task-type, or per-command model
+   * routing — e.g. route search tasks to Haiku and code tasks to Sonnet.
+   */
+  resolveModel?: (
+    ctx: { agent: Record<string, unknown>; task: Record<string, unknown> },
+  ) => string | undefined;
 }
 
 /**
@@ -139,6 +154,13 @@ export async function registerExecutionEngine(opts: {
     const prompt = (task.description as string) ?? (task.title as string) ?? '';
 
     try {
+      // Per-dispatch model routing. Resolver can inspect agent role, task
+      // metadata, or any other signal to pick the right model for this
+      // specific dispatch. Falls back to the global model if not provided.
+      const taskModel = config.resolveModel
+        ? (config.resolveModel({ agent, task }) ?? model)
+        : model;
+
       // Per-dispatch context files (e.g. rendered agent/project rules).
       // The resolver owns all I/O; the engine just concatenates what it
       // gets back. Thrown errors propagate up to the outer catch and fail
@@ -168,7 +190,7 @@ export async function registerExecutionEngine(opts: {
 
       for (let i = 0; i < maxIterations; i++) {
         const createParams: Record<string, unknown> = {
-          model,
+          model: taskModel,
           max_tokens: 4096,
           system: systemPrompt,
           messages,
@@ -224,7 +246,7 @@ export async function registerExecutionEngine(opts: {
         output: finalOutput,
         costCents,
         usage: { inputTokens: totalInput, outputTokens: totalOutput },
-        model,
+        model: taskModel,
         provider: 'anthropic',
       });
     } catch (err) {

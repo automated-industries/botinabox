@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.6] — 2026-04-16
+
+### Added
+
+- **`resolveModel` callback in `ExecutionEngineConfig`.** Optional per-dispatch model resolver that receives the agent and task rows and returns a model ID string. When provided, overrides `config.model` for that specific task dispatch. Enables per-agent, per-task-type, or per-command model routing — e.g. route search tasks to Haiku and code tasks to Sonnet — without modifying the engine's core loop.
+
 ## [2.9.5] — 2026-04-16
 
 ### Added
