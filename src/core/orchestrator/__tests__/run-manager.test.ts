@@ -93,6 +93,34 @@ describe('RunManager — Story 3.3', () => {
     expect(events[0]!['runId']).toBe(runId);
   });
 
+  it('finishRun writes model to runs table when provided', async () => {
+    const runId = await manager.startRun('agent-1', 'task-1');
+    await manager.finishRun(runId, {
+      exitCode: 0,
+      model: 'claude-sonnet-4-20250514',
+      provider: 'anthropic',
+    });
+    const run = await db.get('runs', { id: runId });
+    expect(run!['model']).toBe('claude-sonnet-4-20250514');
+  });
+
+  it('finishRun includes model/provider/usage in run.completed hook', async () => {
+    const events: Record<string, unknown>[] = [];
+    hooks.register('run.completed', (ctx) => { events.push(ctx); });
+    const runId = await manager.startRun('agent-1', 'task-1');
+    await manager.finishRun(runId, {
+      exitCode: 0,
+      model: 'claude-haiku-4-5-20251001',
+      provider: 'anthropic',
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    expect(events[0]!['model']).toBe('claude-haiku-4-5-20251001');
+    expect(events[0]!['provider']).toBe('anthropic');
+    const usage = events[0]!['usage'] as Record<string, unknown>;
+    expect(usage['inputTokens']).toBe(100);
+    expect(usage['outputTokens']).toBe(50);
+  });
+
   it('reapOrphans marks stale running runs as failed', async () => {
     // Insert a run directly with a very old started_at
     const row = await db.insert('runs', {
