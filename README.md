@@ -13,7 +13,8 @@ A modular TypeScript framework for building multi-agent bots with LLM orchestrat
 - **Message interpretation** -- Async structured extraction from messages into tasks, memories, files, and user context. Pluggable extractors for custom data types. Programmatic task creation (no LLM dependency).
 - **Triage routing** -- Content-aware message routing with keyword/regex matching, priority rules, and LLM fallback. Ownership chain logging for every routing decision.
 - **Multi-agent orchestration** -- Define agents with different models, roles, and execution adapters. Task queue with priority scheduling, retry policies, and followup chains.
-- **Loop detection and circuit breakers** -- Pattern-based loop detection (self-loops, ping-pong, blocked re-entry) plus circuit breakers with automatic human escalation.
+- **Loop detection and circuit breakers** -- Pattern-based loop detection (self-loops, ping-pong, blocked re-entry) plus circuit breakers with automatic human escalation. Scheduler connector syncs are circuit-broken per key — persistent connector failures trip the breaker instead of retrying endlessly.
+- **Safe tool merging** -- `mergeTools(nativeTools, localSkills)` deduplicates tool arrays with last-wins semantics. Prevents Anthropic API 400 errors from duplicate tool names when combining built-in and custom tools.
 - **Learning pipeline** -- Structured feedback capture with auto-promotion: 3+ similar records become a playbook, 3+ agents become a reusable skill.
 - **Governance gates** -- Independent QA, quality, and drift gates that validate agent output and report to the human operator.
 - **Permission relay** -- Remote approval via messaging platforms (Slack, Discord, Telegram). Dual approval: local + remote, first wins.
