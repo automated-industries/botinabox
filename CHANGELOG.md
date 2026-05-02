@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.7] — 2026-05-02
+
+### Changed
+
+- **Bumps `latticesql` to `^1.8.0`** (was `^1.6.10`). 1.8.0 adds an optional async surface to `StorageAdapter` (`runAsync`/`getAsync`/`allAsync`/`prepareAsync` + `withClient(fn)` + `dialect: 'sqlite' | 'postgres'`). Botinabox's `DataStore` already returns Promises from its CRUD methods, so consumers get the new async path through their existing `await db.query(...)` calls without code changes on the read/write hot path. Sync surface is still authoritative for SQLite consumers and for any caller that hasn't migrated. The Postgres adapter gains a native `pg.Pool`-backed async surface alongside its existing synckit-bridged sync surface — workloads that issue many sequential queries on the request path no longer block the Node main thread on `Atomics.wait`. Full notes in the latticesql 1.8.0 CHANGELOG.
+
 ## [2.9.6] — 2026-04-16
 
 ### Added
