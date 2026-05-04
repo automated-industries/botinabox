@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.9] — 2026-05-04
+
+### Changed
+
+- **Bumps `latticesql` to `^1.9.0`** (was `^1.8.1`). 1.9.0 flips lattice core to prefer the adapter's async surface over the sync surface at every internal call site — `Lattice.{insert,upsert,update,delete,query,count,render,...}` all route through `pg.Pool` now on Postgres consumers, with a sync fallback for adapters that don't implement the async methods. The Node event loop is no longer blocked on `Atomics.wait` during request-path DB calls. SQLite consumers see no behavioral change. 1.9.0 also fixes a latent Postgres bug where `softDeleteMissing` and `countActive` returned the raw `cnt` field — Postgres ships `COUNT(*)` as a string, silently violating the `Promise<number>` contract; both now coerce with `Number()`. Public API of `Lattice` is unchanged. Full notes in the latticesql 1.9.0 CHANGELOG.
+
 ## [2.9.8] — 2026-05-04
 
 ### Changed
