@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.9.8] — 2026-05-04
+
+### Changed
+
+- **Bumps `latticesql` to `^1.8.1`** (was `^1.8.0`). 1.8.1 fixes a function-name typo in the migration runner — `pg_xact_advisory_lock` (which doesn't exist) was changed to the real `pg_advisory_xact_lock(bigint)`. Postgres consumers that boot through `Lattice.init({ migrations })` were crash-looping on `Fatal: error: function pg_xact_advisory_lock(unknown) does not exist`. 1.8.1 also adds a Postgres integration test (`tests/integration/apply-migrations-async-postgres.test.ts`) plus a `postgres:16` service container in CI so future Postgres-side regressions are caught before publish. Full notes in the latticesql 1.8.1 CHANGELOG.
+
 ## [2.9.7] — 2026-05-02
 
 ### Changed
