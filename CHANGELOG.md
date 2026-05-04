@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.10.0] — 2026-05-04
+
+### Changed
+
+- **Bumps `latticesql` to `^1.10.0`** (was `^1.9.0`). Inherits a BREAKING change from latticesql: the `PostgresAdapter` synchronous methods (`run`/`get`/`all`/`prepare`/`introspectColumns`/`addColumn`) now throw on Postgres — only the async surface (`runAsync`/`getAsync`/`allAsync`/`prepareAsync`/`introspectColumnsAsync`/`addColumnAsync`/`withClient`) does work. Lattice core has routed through async since 1.9.0, so botinabox itself sees zero impact (no botinabox `src/` calls into the sync adapter surface). Consumers of botinabox who escape into `(db as unknown).lattice.adapter` for raw SQL may need to migrate. `synckit` is no longer an `optionalDependency` of `latticesql` — drop it from any consumer install lists. Full notes in the latticesql 1.10.0 CHANGELOG.
+
+### Notes for upgraders
+
+- Minor bump (not patch) because the inherited BREAKING affects downstream installs (synckit drop) — even though botinabox's own code is unchanged.
+
 ## [2.9.9] — 2026-05-04
 
 ### Changed
