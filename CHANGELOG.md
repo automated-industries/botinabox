@@ -6,6 +6,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.12.0] — 2026-05-05
+
+### Fixed
+
+- **`GoogleCalendarConnector.syncFull` now mints `nextSyncToken`.** The full-sync path previously sent `timeMin` and `orderBy: 'startTime'` to `events.list`, which the Google Calendar API documents as preventing the response from including `nextSyncToken`. Combined with an inner records-cap (`maxResults` default 250) that exited the pagination loop early, `syncFull` returned `{ cursor: undefined, hasMore: true }` on any non-trivial calendar — `syncIncremental` could never be bootstrapped, so every consumer effectively did a full pull every time. The fix removes `timeMin`, `orderBy`, and the records-cap loop exit, and drains pagination to completion regardless of `options.limit`. The 410 expired-token fallback path inherits the same fix automatically. `singleEvents: true` is preserved (does not block `nextSyncToken`).
+
+### Changed (behavior shift, type-compatible)
+
+- **`options.limit` and `options.since` are now ignored on the calendar full-sync path.** A partial first sync cannot mint a usable cursor, so honoring those options would defeat the purpose of the fix. `syncIncremental` (via `options.cursor`) still respects `options.limit` for bounded follow-up syncs — that is the intended way to cap work after the first sync. Consumers who relied on the implicit 30-day window will now receive every event on the calendar on first sync, which is the correct semantic for "build a fresh index, then track deltas." No type-signature change; existing call sites continue to compile.
+
+### Added
+
+- **Regression test for `ExecutionEngineConfig.resolveContextFiles` reaching the system prompt.** Asserts the resolver's output is concatenated into the assembled `system` field for both the plain-string and `cacheSystemPrompt: true` (ephemeral cache block) paths, that the resolver receives the resolved agent and task rows, that the contextFiles XML block is omitted entirely when no resolver is configured, and that a thrown resolver error fails the run loudly with no silent fallback. No production code change — purely a guard against future regressions in the engine's prompt assembly.
+
+### Notes for upgraders
+
+- Minor bump. The calendar full-sync behavior shift is patch-level in spirit (the previous behavior was a bug — no usable cursor was ever minted), but the on-the-wire request shape and the first-sync record set both change, so a minor bump is the conservative choice. If your app capped full-sync work via `limit` or `since`, switch to a one-shot full sync followed by `cursor`-driven incremental syncs to bound the workload.
+
 ## [2.11.0] — 2026-05-05
 
 ### Added

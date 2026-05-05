@@ -216,18 +216,25 @@ export class GoogleCalendarConnector implements Connector<CalendarEventRecord> {
     };
   }
 
-  /** Full sync using timeMin. */
+  /**
+   * Full sync — paginates through every event for the calendar to obtain a
+   * `nextSyncToken`. Google only emits `nextSyncToken` on the final page of a
+   * query that contains none of `timeMin`, `timeMax`, `orderBy`, `q`,
+   * `updatedMin`, `eventTypes`, `iCalUID`, `showDeleted`, or
+   * `showHiddenInvitations`. This implementation therefore omits all of those
+   * parameters and drains pagination to completion regardless of `options.limit`
+   * or `options.since` — a partial first sync would never mint a usable cursor,
+   * which would break every subsequent `syncIncremental` call.
+   *
+   * `options.limit` and `options.since` are intentionally ignored on full sync.
+   * Use `syncIncremental` (via `options.cursor`) for bounded follow-up syncs.
+   */
   private async syncFull(
     options?: SyncOptions,
   ): Promise<SyncResult<CalendarEventRecord>> {
     const calendarId = (options?.filters?.calendarId as string) ?? 'primary';
     const records: CalendarEventRecord[] = [];
     const errors: SyncResult<CalendarEventRecord>['errors'] = [];
-    const maxResults = options?.limit ?? 250;
-
-    const timeMin = options?.since
-      ? new Date(options.since).toISOString()
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(); // default: 30 days ago
 
     let pageToken: string | undefined;
     let nextSyncToken: string | undefined;
@@ -235,10 +242,8 @@ export class GoogleCalendarConnector implements Connector<CalendarEventRecord> {
     do {
       const res = await this.calendar.events.list({
         calendarId,
-        timeMin,
         singleEvents: true,
-        orderBy: 'startTime',
-        maxResults: Math.min(maxResults - records.length, 250),
+        maxResults: 250,
         ...(pageToken ? { pageToken } : {}),
       });
 
@@ -248,17 +253,16 @@ export class GoogleCalendarConnector implements Connector<CalendarEventRecord> {
         } catch (err: unknown) {
           errors.push({ id: event.id, error: errorMessage(err) });
         }
-        if (records.length >= maxResults) break;
       }
 
       pageToken = res.data.nextPageToken ?? undefined;
       nextSyncToken = res.data.nextSyncToken ?? undefined;
-    } while (pageToken && records.length < maxResults);
+    } while (pageToken);
 
     return {
       records,
       cursor: nextSyncToken,
-      hasMore: !!pageToken,
+      hasMore: false,
       errors,
     };
   }

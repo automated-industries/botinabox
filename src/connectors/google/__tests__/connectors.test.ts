@@ -660,6 +660,80 @@ describe('GoogleCalendarConnector', () => {
       expect(e2.allDay).toBe(true);
       expect(e2.title).toBe('All-day offsite');
     });
+
+    it('omits timeMin and orderBy from the events.list request', async () => {
+      // Google only emits nextSyncToken when the request contains none of
+      // timeMin / timeMax / orderBy / q / updatedMin / etc. Guard the request
+      // shape so a future "improvement" doesn't silently break syncToken
+      // minting again.
+      await connector.connect(TEST_CONFIG);
+
+      mockCalendar.events.list.mockResolvedValue({
+        data: { items: [], nextSyncToken: 'st-x' },
+      });
+
+      await connector.sync();
+
+      expect(mockCalendar.events.list).toHaveBeenCalledTimes(1);
+      const call = mockCalendar.events.list.mock.calls[0][0];
+      expect(call).toEqual(
+        expect.objectContaining({
+          calendarId: 'primary',
+          singleEvents: true,
+        }),
+      );
+      expect(call).not.toHaveProperty('timeMin');
+      expect(call).not.toHaveProperty('timeMax');
+      expect(call).not.toHaveProperty('orderBy');
+      expect(call).not.toHaveProperty('q');
+      expect(call).not.toHaveProperty('updatedMin');
+    });
+
+    it('paginates through every page and returns the final nextSyncToken', async () => {
+      // syncFull MUST drain pagination — Google only attaches nextSyncToken
+      // to the response on the last page. Stopping early at a records cap
+      // would yield cursor: undefined and force every consumer to re-do a
+      // full sync forever.
+      await connector.connect(TEST_CONFIG);
+
+      const evt = (id: string) => ({
+        id,
+        summary: `Event ${id}`,
+        start: { dateTime: '2024-01-01T10:00:00Z' },
+        end: { dateTime: '2024-01-01T11:00:00Z' },
+        status: 'confirmed',
+        organizer: { email: 'org@example.com' },
+      });
+
+      mockCalendar.events.list
+        .mockResolvedValueOnce({
+          data: { items: [evt('p1-a'), evt('p1-b')], nextPageToken: 'p2' },
+        })
+        .mockResolvedValueOnce({
+          data: { items: [evt('p2-a')], nextPageToken: 'p3' },
+        })
+        .mockResolvedValueOnce({
+          // Last page: no nextPageToken, syncToken attached.
+          data: { items: [evt('p3-a')], nextSyncToken: 'st-final' },
+        });
+
+      const result = await connector.sync();
+
+      expect(mockCalendar.events.list).toHaveBeenCalledTimes(3);
+      // Page 1: no pageToken
+      expect(mockCalendar.events.list.mock.calls[0][0]).not.toHaveProperty('pageToken');
+      // Pages 2 and 3: pageToken from previous response
+      expect(mockCalendar.events.list.mock.calls[1][0]).toEqual(
+        expect.objectContaining({ pageToken: 'p2' }),
+      );
+      expect(mockCalendar.events.list.mock.calls[2][0]).toEqual(
+        expect.objectContaining({ pageToken: 'p3' }),
+      );
+
+      expect(result.records).toHaveLength(4);
+      expect(result.cursor).toBe('st-final');
+      expect(result.hasMore).toBe(false);
+    });
   });
 
   // ── sync() incremental mode ───────────────────────────────────────
@@ -737,13 +811,15 @@ describe('GoogleCalendarConnector', () => {
         expect.objectContaining({ syncToken: 'stale-token' }),
       );
 
-      // Second call is a full sync (timeMin, singleEvents, orderBy)
-      expect(mockCalendar.events.list.mock.calls[1][0]).toEqual(
-        expect.objectContaining({
-          singleEvents: true,
-          orderBy: 'startTime',
-        }),
+      // Second call is a full sync. To mint a fresh nextSyncToken, Google
+      // requires the request to omit timeMin, orderBy, etc. — see syncFull
+      // doc comment. singleEvents stays on (does not block nextSyncToken).
+      const fullSyncCall = mockCalendar.events.list.mock.calls[1][0];
+      expect(fullSyncCall).toEqual(
+        expect.objectContaining({ singleEvents: true }),
       );
+      expect(fullSyncCall).not.toHaveProperty('timeMin');
+      expect(fullSyncCall).not.toHaveProperty('orderBy');
 
       expect(result.records).toHaveLength(1);
       expect(result.records[0].title).toBe('Recovered event');
