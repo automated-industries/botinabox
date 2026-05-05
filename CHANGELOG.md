@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.11.0] — 2026-05-05
+
+### Added
+
+- **`ExecutionEngineConfig.cacheSystemPrompt?: boolean`.** Optional flag that marks the assembled system prompt as ephemerally cacheable. When `true`, the engine sends `system` as a single-element content block array with `cache_control: { type: 'ephemeral' }` instead of a plain string, letting Anthropic's prompt-cache layer serve hits across calls within the 5-minute ephemeral TTL. When `false` or omitted, the engine emits `system: '<string>'` as before — fully backward-compatible. See `docs/architecture.md` for usage details.
+
+### Notes for upgraders
+
+- Minor bump. Additive config field — no behavioral change unless you opt in by passing `cacheSystemPrompt: true`.
+
 ## [2.10.1] — 2026-05-04
 
 ### Fixed

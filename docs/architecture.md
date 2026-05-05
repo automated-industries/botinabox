@@ -409,6 +409,20 @@ resolveContextFiles?: (
 
 The engine calls the resolver once per task pickup, wraps each returned file in `<file path="...">...</file>` XML tags via the exported `formatContextFilesBlock()` helper, and inserts the block into the system prompt between the static `buildSystemContext` output and the tool listing. The resolver owns all filesystem and database reads — the engine does no I/O of its own — and thrown errors propagate up to fail the task loudly with no silent fallback. Typical uses: injecting rendered per-agent rules, per-project playbooks, or shared CLAUDE.md-style platform documents into the system prompt without hard-coding them in the engine.
 
+**Ephemeral system-prompt caching.** Set `cacheSystemPrompt: true` on the `ExecutionEngineConfig` to let Anthropic's prompt cache serve hits across calls within the 5-minute ephemeral TTL:
+
+```ts
+cacheSystemPrompt?: boolean; // default: false
+```
+
+When `true`, the engine sends the assembled system prompt as a single-element content block array with `cache_control: { type: 'ephemeral' }`:
+
+```ts
+{ system: [{ type: 'text', text: '<assembled prompt>', cache_control: { type: 'ephemeral' } }], ... }
+```
+
+When `false` or omitted, the engine sends `system: '<assembled prompt>'` as before — a plain string, no cache marker, fully backward-compatible. The marker on the last (and only) block tells Anthropic to cache everything up to and including that block; subsequent calls within the 5-minute ephemeral window hit the cache when the system prompt content is byte-identical. Useful when the assembled prompt (agent identity + system context + context files + tool listing + suffix) is large and stable across the iterations of a single task or short cluster of tasks.
+
 ### CLI Adapter (Subprocess)
 
 The `CliExecutionAdapter` spawns a subprocess with the task prompt, captures stdout/stderr, and returns the output with the exit code.
