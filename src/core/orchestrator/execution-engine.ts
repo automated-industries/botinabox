@@ -94,6 +94,17 @@ export interface ExecutionEngineConfig {
   resolveModel?: (
     ctx: { agent: Record<string, unknown>; task: Record<string, unknown> },
   ) => string | undefined;
+  /**
+   * Mark the system prompt as ephemerally cacheable. When true, the engine
+   * sends the system prompt as a single-element content block array with
+   * `cache_control: { type: 'ephemeral' }` instead of a plain string. This
+   * lets Anthropic's prompt-cache layer serve hits across calls within the
+   * 5-minute ephemeral TTL.
+   *
+   * Default: false (system prompt is sent as a plain string — unchanged
+   * behavior).
+   */
+  cacheSystemPrompt?: boolean;
 }
 
 /**
@@ -188,11 +199,21 @@ export async function registerExecutionEngine(opts: {
       let totalInput = 0;
       let totalOutput = 0;
 
+      const systemField = config.cacheSystemPrompt
+        ? [
+            {
+              type: 'text',
+              text: systemPrompt,
+              cache_control: { type: 'ephemeral' },
+            },
+          ]
+        : systemPrompt;
+
       for (let i = 0; i < maxIterations; i++) {
         const createParams: Record<string, unknown> = {
           model: taskModel,
           max_tokens: 4096,
-          system: systemPrompt,
+          system: systemField,
           messages,
         };
         if (toolDefs.length > 0) {
