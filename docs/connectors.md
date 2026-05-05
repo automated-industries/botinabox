@@ -419,10 +419,12 @@ await calendar.connect({
 ### Sync (pull events)
 
 ```typescript
-// Full sync -- defaults to events from the last 30 days
+// Full sync -- paginates through every event for the calendar to mint a
+// fresh `nextSyncToken`. `limit` and `since` are intentionally ignored on
+// the full-sync code path because Google only emits `nextSyncToken` on
+// the final page of an unfiltered query. Use the returned cursor with
+// incremental sync for bounded follow-ups.
 const result = await calendar.sync({
-  limit: 100,
-  since: '2025-01-01T00:00:00Z',
   filters: { calendarId: 'primary' },   // Default: 'primary'
 });
 
@@ -822,8 +824,8 @@ await syncLoop(
 
 ### Calendar sync details
 
-- **Full sync**: Lists events using the Calendar Events API with `timeMin` (defaults to 30 days ago). Returns a `nextSyncToken` as the cursor.
-- **Incremental sync**: Uses the Calendar Events API with `syncToken`. If the token is expired (HTTP 410), automatically falls back to a full sync.
+- **Full sync**: Lists events using the Calendar Events API and paginates through every page. The request omits `timeMin`, `timeMax`, `orderBy`, `q`, `updatedMin`, and other filters that would prevent Google from emitting `nextSyncToken` on the final page. Returns the minted `nextSyncToken` as the cursor. `options.limit` and `options.since` are ignored on full sync — partial pagination cannot mint a usable cursor.
+- **Incremental sync**: Uses the Calendar Events API with `syncToken`. Respects `options.limit` for bounded paging. If the token is expired (HTTP 410), automatically falls back to a full sync.
 
 ### Drive sync details
 
