@@ -45,6 +45,7 @@ export class ColumnValidatorImpl implements ColumnValidator {
   }
 
   invalidateCache(_table: string): void {
-    // No-op: DataStore.tableInfo() queries SQLite directly each time (no cache)
+    // No-op: DataStore.tableInfo() reads from a column cache that
+    // DataStore.migrate() refreshes after every ALTER TABLE / migration.
   }
 }

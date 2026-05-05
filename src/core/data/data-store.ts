@@ -22,6 +22,8 @@ export class DataStore {
   private readonly outputDir: string | undefined;
   private _initialized = false;
   private readonly deferredStatements: string[] = [];
+  private readonly definedTables: string[] = [];
+  private readonly columnCache = new Map<string, string[]>();
 
   constructor(opts: {
     dbPath: string;
@@ -70,6 +72,7 @@ export class DataStore {
       render: def.render as import('latticesql').RenderSpec | undefined,
       outputFile: def.outputFile,
     });
+    this.definedTables.push(name);
   }
 
   /**
@@ -118,15 +121,38 @@ export class DataStore {
 
   async init(opts?: { migrations?: Array<{ version: string; sql: string }> }): Promise<void> {
     await this.lattice.init({ migrations: opts?.migrations });
-    // Run deferred statements (CREATE INDEX, etc.) after tables exist.
-    // Use the portable adapter API instead of `lattice.db.exec()` so this
-    // works under both SQLite and Postgres backends. Deferred statements
-    // are validated to be single-statement (no semicolons) above, so
-    // adapter.run() is the right call.
-    for (const stmt of this.deferredStatements) {
-      this.lattice.adapter.run(stmt);
+    const adapter = this.lattice.adapter;
+    if (!adapter.runAsync || !adapter.introspectColumnsAsync) {
+      throw new DataStoreError(
+        'StorageAdapter must implement runAsync and introspectColumnsAsync (latticesql 1.10.0+)',
+      );
     }
+    // Run deferred statements (CREATE INDEX, etc.) after tables exist.
+    // Use the async adapter surface — sync run() throws on Postgres as of
+    // latticesql 1.10.0. Deferred statements are validated to be
+    // single-statement (no semicolons) above.
+    for (const stmt of this.deferredStatements) {
+      await adapter.runAsync(stmt);
+    }
+    await this._refreshColumnCache();
     this._initialized = true;
+  }
+
+  // Pre-populate column cache so synchronous tableInfo() works on Postgres,
+  // where introspectColumns sync throws as of latticesql 1.10.0. Refreshed
+  // from init() and migrate() — both are the only entry points that can
+  // alter table schemas.
+  private async _refreshColumnCache(): Promise<void> {
+    const adapter = this.lattice.adapter;
+    if (!adapter.introspectColumnsAsync) {
+      throw new DataStoreError(
+        'StorageAdapter must implement introspectColumnsAsync (latticesql 1.10.0+)',
+      );
+    }
+    for (const table of this.definedTables) {
+      const cols = await adapter.introspectColumnsAsync(table);
+      this.columnCache.set(table, cols);
+    }
   }
 
   private assertInitialized(): void {
@@ -196,6 +222,12 @@ export class DataStore {
   async migrate(migrations: Array<{ version: string; sql: string }>): Promise<void> {
     this.assertInitialized();
     await this.lattice.migrate(migrations);
+    // Migrations may add/drop columns — refresh the synchronous column cache
+    // that tableInfo() reads from, including any tables whose schema just
+    // changed. Also clears stale entries cached for unknown (non-define()d)
+    // tables on first tableInfo() lookup.
+    this.columnCache.clear();
+    await this._refreshColumnCache();
   }
 
   // --- Seed -----------------------------------------------------------
@@ -242,13 +274,21 @@ export class DataStore {
 
   tableInfo(table: string): TableInfoRow[] {
     this.assertInitialized();
-    // Use the portable adapter API instead of `lattice.db.pragma(...)` so
-    // this works under both SQLite and Postgres backends. The full
-    // PRAGMA-shaped row (cid/type/notnull/dflt_value/pk) is only available
-    // on SQLite; under Postgres we return name-only rows with the other
-    // fields zeroed. Current consumers (column-validator, schema tests)
-    // only read `.name`, so this is a compatible reduction.
-    const names = this.lattice.adapter.introspectColumns(table);
+    // Reads from the column cache populated during init(). For define()d
+    // tables this is always a hit. For tables touched only via the raw
+    // .lattice.adapter escape hatch (not registered through DataStore.define),
+    // fall back to sync introspectColumns — works on SQLite, throws with
+    // SYNC_NOT_SUPPORTED_MSG on Postgres (latticesql 1.10.0+), which is the
+    // right behavior: a Postgres caller reading an unregistered table should
+    // know to await introspectColumnsAsync directly. Returns name-only rows
+    // (cid/type/notnull/dflt_value/pk zeroed); current consumers only read
+    // `.name`, so the reduced shape is a compatible projection of the legacy
+    // SQLite PRAGMA shape.
+    let names = this.columnCache.get(table);
+    if (!names) {
+      names = this.lattice.adapter.introspectColumns(table);
+      this.columnCache.set(table, names);
+    }
     return names.map((name, cid) => ({
       cid,
       name,
