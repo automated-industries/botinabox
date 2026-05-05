@@ -6,6 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.10.1] — 2026-05-04
+
+### Fixed
+
+- **`DataStore.init()` and `DataStore.tableInfo()` no longer call the synchronous adapter surface.** 2.10.0 inherited the BREAKING latticesql 1.10.0 change (sync `run`/`introspectColumns` etc. throw on Postgres), but two of botinabox's own call sites still routed through sync: (1) `init()` flushed `deferredStatements` (CREATE INDEX) via `lattice.adapter.run(stmt)`, and (2) `tableInfo()` called `lattice.adapter.introspectColumns(table)` on every read (used by `ColumnValidator` on every CRUD insert/update). On Postgres these crashed every container at boot with `PostgresAdapter: synchronous adapter methods … are no longer supported`.
+  - `init()` now flushes `deferredStatements` via `adapter.runAsync()` and pre-populates a per-DataStore column cache via `adapter.introspectColumnsAsync()` for every `define()`d table.
+  - `tableInfo()` now reads from that cache (sync API preserved). Consumers do NOT need to migrate to an async signature.
+  - `migrate()` clears + refreshes the cache after applying migrations so ALTER TABLE / column additions are visible to subsequent `tableInfo()` reads.
+  - For tables touched only via the raw `db.lattice.adapter` escape hatch (not `define()`d), `tableInfo()` falls back to sync `introspectColumns` — works on SQLite, throws on Postgres with the latticesql 1.10.0 message (which is the right behavior: Postgres callers reading unregistered tables should call `introspectColumnsAsync` directly).
+
+### Notes for upgraders
+
+- Patch bump. Pure bug fix. Public API unchanged. Restores the contract that `botinabox` 2.10.0 was supposed to deliver against `latticesql` 1.10.0+.
+
 ## [2.10.0] — 2026-05-04
 
 ### Changed
