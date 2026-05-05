@@ -161,3 +161,128 @@ describe('registerExecutionEngine — resolveModel', () => {
     expect(capturedModel).toBe('claude-sonnet-4-20250514');
   });
 });
+
+describe('registerExecutionEngine — cacheSystemPrompt', () => {
+  let db: DataStore;
+  let hooks: HookBus;
+  let runs: RunManager;
+
+  beforeEach(async () => {
+    db = new DataStore({ dbPath: ':memory:' });
+    defineCoreTables(db);
+    await db.init();
+    hooks = new HookBus();
+    runs = new RunManager(db, hooks);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it('sends system as a plain string by default', async () => {
+    await db.insert('agents', { id: 'a1', slug: 'plain', name: 'Plain', role: 'engineer', adapter: 'api' });
+    await db.insert('tasks', { id: 't1', title: 'Do it', assignee_id: 'a1', status: 'todo' });
+
+    let capturedSystem: unknown;
+    const mockClient = {
+      messages: {
+        create: async (params: Record<string, unknown>) => {
+          capturedSystem = params.system;
+          return {
+            content: [{ type: 'text', text: 'ok' }],
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          };
+        },
+      },
+    };
+
+    await registerExecutionEngine({
+      db, hooks, runs,
+      config: {
+        client: mockClient,
+        model: 'claude-sonnet-4-20250514',
+        includeSystemContext: false,
+      },
+    });
+
+    await hooks.emit('task.created', { id: 't1' });
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(typeof capturedSystem).toBe('string');
+    expect(capturedSystem as string).toContain('You are Plain');
+  });
+
+  it('sends system as a single ephemeral cache block when cacheSystemPrompt is true', async () => {
+    await db.insert('agents', { id: 'a2', slug: 'cached', name: 'Cached', role: 'engineer', adapter: 'api' });
+    await db.insert('tasks', { id: 't2', title: 'Do it', assignee_id: 'a2', status: 'todo' });
+
+    let capturedSystem: unknown;
+    const mockClient = {
+      messages: {
+        create: async (params: Record<string, unknown>) => {
+          capturedSystem = params.system;
+          return {
+            content: [{ type: 'text', text: 'ok' }],
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          };
+        },
+      },
+    };
+
+    await registerExecutionEngine({
+      db, hooks, runs,
+      config: {
+        client: mockClient,
+        model: 'claude-sonnet-4-20250514',
+        includeSystemContext: false,
+        cacheSystemPrompt: true,
+      },
+    });
+
+    await hooks.emit('task.created', { id: 't2' });
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(Array.isArray(capturedSystem)).toBe(true);
+    const blocks = capturedSystem as Array<{ type: string; text: string; cache_control: { type: string } }>;
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.type).toBe('text');
+    expect(blocks[0]!.cache_control).toEqual({ type: 'ephemeral' });
+    expect(blocks[0]!.text).toContain('You are Cached');
+  });
+
+  it('sends system as a plain string when cacheSystemPrompt is explicitly false', async () => {
+    await db.insert('agents', { id: 'a3', slug: 'opt-out', name: 'OptOut', role: 'engineer', adapter: 'api' });
+    await db.insert('tasks', { id: 't3', title: 'Do it', assignee_id: 'a3', status: 'todo' });
+
+    let capturedSystem: unknown;
+    const mockClient = {
+      messages: {
+        create: async (params: Record<string, unknown>) => {
+          capturedSystem = params.system;
+          return {
+            content: [{ type: 'text', text: 'ok' }],
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          };
+        },
+      },
+    };
+
+    await registerExecutionEngine({
+      db, hooks, runs,
+      config: {
+        client: mockClient,
+        model: 'claude-sonnet-4-20250514',
+        includeSystemContext: false,
+        cacheSystemPrompt: false,
+      },
+    });
+
+    await hooks.emit('task.created', { id: 't3' });
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(typeof capturedSystem).toBe('string');
+  });
+});
