@@ -91,3 +91,54 @@ describe('parseSlackEvent — threadId resolution', () => {
     expect(parent.threadId).toBe(reply.threadId);
   });
 });
+
+describe('parseSlackEvent — id resolution prefers ts', () => {
+  it('uses event.ts as id even when client_msg_id is present', () => {
+    const event = {
+      type: 'message',
+      ts: '1776308368.646379',
+      client_msg_id: '5c36f24c-5423-482d-bcce-bb551a1c5134',
+      channel: 'D_DM',
+      user: 'U_USER',
+      text: 'hello',
+    };
+    const msg = parseSlackEvent(event);
+    expect(msg.id).toBe('1776308368.646379');
+  });
+
+  it('falls back to event_ts when ts is absent', () => {
+    const event = {
+      type: 'message',
+      event_ts: '1776308368.646380',
+      client_msg_id: '5c36f24c-5423-482d-bcce-bb551a1c5134',
+      channel: 'D_DM',
+      user: 'U_USER',
+      text: 'hello',
+    };
+    const msg = parseSlackEvent(event);
+    expect(msg.id).toBe('1776308368.646380');
+  });
+
+  it('falls back to client_msg_id when neither ts nor event_ts is present', () => {
+    const event = {
+      type: 'message',
+      client_msg_id: '5c36f24c-5423-482d-bcce-bb551a1c5134',
+      channel: 'D_DM',
+      user: 'U_USER',
+      text: 'hello',
+    };
+    const msg = parseSlackEvent(event);
+    expect(msg.id).toBe('5c36f24c-5423-482d-bcce-bb551a1c5134');
+  });
+
+  it('falls back to a generated marker when no id source is present', () => {
+    const event = {
+      type: 'message',
+      channel: 'D_DM',
+      user: 'U_USER',
+      text: 'hello',
+    };
+    const msg = parseSlackEvent(event);
+    expect(msg.id.startsWith('slack-')).toBe(true);
+  });
+});
