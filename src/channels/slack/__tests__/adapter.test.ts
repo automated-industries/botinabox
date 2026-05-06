@@ -89,7 +89,10 @@ describe("parseSlackEvent — Story 4.5", () => {
       text: "Hello world",
     };
     const msg = parseSlackEvent(event);
-    expect(msg.id).toBe("abc-123");
+    // `ts` wins over `client_msg_id` as the canonical Slack identifier —
+    // see inbound.ts comment block. The dedicated coverage for the
+    // fallback chain lives in inbound.test.ts.
+    expect(msg.id).toBe("1617000000.000001");
     expect(msg.channel).toBe("C123");
     expect(msg.from).toBe("U456");
     expect(msg.body).toBe("Hello world");

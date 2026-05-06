@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.12.1] — 2026-05-06
+
+### Fixed
+
+- **`parseSlackEvent` now uses `event.ts` as `InboundMessage.id` instead of `event.client_msg_id`.** The previous fallback chain (`client_msg_id ?? ts ?? event_ts ?? generated`) preferred Slack's client-generated UUID over the canonical message timestamp. `client_msg_id` is set by official Slack clients (desktop, mobile) and identifies the user-typed message, but `ts` is what Slack uses everywhere else: `chat.update`/`chat.delete` reference it, permalinks are built from it, `reactions.add`/`reactions.remove` require it as their `timestamp` parameter, and `conversations.history` returns it. Using a UUID as `msg.id` meant downstream consumers (audit logs, dedup keys, retro queries) could not join routing decisions back to specific Slack messages without an extra Slack API call. Bot messages and edits often lack `client_msg_id` entirely, so the previous behavior already silently fell through to `ts` for those — this PR makes that the consistent behavior for every message. The new order is `ts ?? event_ts ?? client_msg_id ?? generated`, preserving the existing fallbacks for events that genuinely lack a server-side timestamp.
+
+### Notes for upgraders
+
+- Patch bump. `InboundMessage.id` shape is unchanged (still a string); only the source field changes. Consumers that hash, dedupe, or persist `msg.id` should re-evaluate any cached state after upgrading — old rows will have UUIDs, new rows will have Slack timestamps. Both formats remain unique per message; the change is forward-compatible.
+
+---
+
 ## [2.12.0] — 2026-05-05
 
 ### Fixed

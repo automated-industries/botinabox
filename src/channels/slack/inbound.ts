@@ -60,7 +60,17 @@ export function extractVoiceTranscript(file: SlackFile): string | null {
  * with `[Voice message]`.
  */
 export function parseSlackEvent(event: SlackEvent): InboundMessage {
-  const id = event.client_msg_id ?? event.ts ?? event.event_ts ?? `slack-${Date.now()}`;
+  // Prefer Slack's canonical message timestamp (`ts`) over the
+  // client-generated `client_msg_id` UUID. `ts` is what Slack uses
+  // everywhere — `chat.update`/`chat.delete` reference it, permalinks are
+  // built from it, `reactions.add`/`reactions.remove` require it as their
+  // `timestamp` parameter, and it's what `conversations.history` returns.
+  // Using it as `msg.id` lets downstream consumers (audit logs, dedup,
+  // retro queries) join routing decisions back to specific Slack messages
+  // without an extra lookup. `client_msg_id` is set only by official Slack
+  // clients (desktop/mobile) — bot messages and edits often lack it — so
+  // it's an inferior identifier in every dimension that matters here.
+  const id = event.ts ?? event.event_ts ?? event.client_msg_id ?? `slack-${Date.now()}`;
   const channel = event.channel ?? "unknown";
   const from = event.user ?? "unknown";
   // For thread replies, use thread_ts (the parent message's ts).
