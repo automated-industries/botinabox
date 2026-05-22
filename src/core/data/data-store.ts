@@ -67,6 +67,8 @@ export class DataStore {
       columns: def.columns,
       primaryKey: def.primaryKey,
       tableConstraints: inlineConstraints.length ? inlineConstraints : undefined,
+      rewardTracking: def.rewardTracking,
+      pruneBelow: def.pruneBelow,
       relations: def.relations as Record<string, import('latticesql').Relation> | undefined,
       filter: def.filter,
       render: def.render as import('latticesql').RenderSpec | undefined,
@@ -203,6 +205,29 @@ export class DataStore {
   async count(table: string, opts?: QueryOptions): Promise<number> {
     this.assertInitialized();
     return this.lattice.count(table, opts as import('latticesql').CountOptions);
+  }
+
+  // --- Reward tracking ------------------------------------------------
+
+  /**
+   * Update reward scores for a row. Requires `rewardTracking: true` in the
+   * table definition (otherwise the underlying engine throws). Dimension
+   * names in `scores` are arbitrary; values should be in [0, 1]. The engine
+   * tracks a running average across all `reward()` calls in
+   * `_reward_total` / `_reward_count`, and `db.render()` sorts rows by that
+   * average — so high-reward rows surface first to any consumer of the
+   * rendered context tree.
+   *
+   * Example:
+   *   await db.reward('memos', id, { relevance: 0.9, accuracy: 1.0 });
+   */
+  async reward(
+    table: string,
+    id: string,
+    scores: import('latticesql').RewardScores,
+  ): Promise<void> {
+    this.assertInitialized();
+    await this.lattice.reward(table, id, scores);
   }
 
   // --- Junctions ------------------------------------------------------

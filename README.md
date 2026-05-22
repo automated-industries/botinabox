@@ -162,7 +162,7 @@ Cross-cutting concerns -- **HookBus** (events), **DataStore** (persistence), **S
 
 **HookBus** is the central event bus. Handlers subscribe to named events with optional priority ordering and payload filters. Errors in one handler never block others. Use it to decouple layers -- the task queue emits `task.created`, the run manager emits `run.completed`, channels emit `message.inbound`, and your application code listens to whichever events it needs.
 
-**DataStore** wraps [latticesql](https://github.com/automated-industries/lattice) to provide schema-driven SQLite persistence. You call `db.define()` to register table schemas, then `db.init()` to create them. It supports insert, update, upsert, get, query, delete, and migrations. WAL mode is enabled by default for concurrent read access.
+**DataStore** wraps [latticesql](https://github.com/automated-industries/lattice) to provide schema-driven SQLite persistence. You call `db.define()` to register table schemas, then `db.init()` to create them. It supports insert, update, upsert, get, query, delete, reward (usefulness-weighted render ordering, opt-in via `rewardTracking`), and migrations. WAL mode is enabled by default for concurrent read access.
 
 **AgentRegistry** manages the lifecycle of agents -- registration, status transitions (idle/running/paused/terminated), configuration revisions, and activity logging. Each agent has a slug, name, adapter type, role, and optional budget. Agents are stored in the database and can be seeded from config on startup.
 

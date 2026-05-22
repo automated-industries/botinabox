@@ -6,6 +6,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.13.0] — 2026-05-22
+
+### Added
+
+- **`DataStore.reward(table, id, scores)`** — thin pass-through to the underlying engine's reward-tracking. Update arbitrary dimension scores (values in `[0, 1]`) on a row; the engine maintains a running average across calls in `_reward_total` / `_reward_count`, and `db.render()` sorts rows by that average so high-reward rows surface first to any consumer of the rendered output. Requires `rewardTracking: true` on the `TableDefinition` (otherwise the engine throws).
+- **`TableDefinition.rewardTracking?: boolean`** — opt a table into reward tracking at `define()` time. Auto-adds the `_reward_total` (`REAL`) and `_reward_count` (`INTEGER`) columns; sorts rows by reward during render.
+- **`TableDefinition.pruneBelow?: number`** — soft-delete rows whose reward total falls below this threshold during the next render. Requires a `deleted_at` column. Use with care: a positive threshold also prunes brand-new rows that have not accumulated any reward yet.
+
+### Why
+
+The underlying engine (LatticeSQL 1.3+) has shipped reward tracking for a while, but `DataStore.define()` filtered the forwarded `TableDefinition` to a fixed set of fields — `rewardTracking` and `pruneBelow` were silently dropped at the wrapper boundary, and no `reward()` method was exposed on `DataStore`. This release plumbs both fields through and adds the matching `reward()` delegate. The pure-mechanical wrapper change unlocks usefulness-weighted render ordering for any `botinabox` consumer that wants to wire it.
+
+### Notes for upgraders
+
+- Additive minor release. Existing tables and call sites are unaffected — both new `TableDefinition` fields are optional and default to off, and `DataStore.reward()` is a new method on the surface. No migrations required for tables you don't opt in.
+- Opt-in pattern:
+  ```typescript
+  db.define('memos', {
+    columns: { id: 'TEXT PRIMARY KEY', content: 'TEXT' },
+    rewardTracking: true,
+    // pruneBelow: 0.3,  // optional — leave off until you've observed the score distribution
+  });
+  // ...later, from any code path that has a usefulness signal:
+  await db.reward('memos', id, { relevance: 0.9, accuracy: 1.0 });
+  ```
+- `pruneBelow` is intentionally off by default. Setting it above `0` on a freshly-opted-in table will soft-delete every row that has not yet been rewarded.
+
+---
+
 ## [2.12.1] — 2026-05-06
 
 ### Fixed
