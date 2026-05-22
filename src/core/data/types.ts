@@ -2,6 +2,20 @@ export interface TableDefinition {
   columns: Record<string, string>;
   primaryKey?: string | string[];
   tableConstraints?: string[];
+  /**
+   * Latticesql reward tracking (1.3+). When `true`, the underlying engine
+   * auto-adds `_reward_total` (REAL) and `_reward_count` (INTEGER) columns
+   * to the table; rows are sorted by reward during render. Update scores
+   * with `db.reward(table, id, scores)`.
+   */
+  rewardTracking?: boolean;
+  /**
+   * Soft-delete rows whose reward total falls below this threshold during
+   * the next render. Requires a `deleted_at` column on the table. Use with
+   * care: a positive threshold also prunes brand-new rows that have not
+   * yet accumulated any reward.
+   */
+  pruneBelow?: number;
   relations?: Record<string, RelationDef>;
   render?: string | ((rows: Row[]) => string);
   outputFile?: string;
