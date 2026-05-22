@@ -73,6 +73,7 @@ await db.init();
 | `get(table, pk)` | `Promise<Row \| undefined>` | Get by primary key |
 | `query(table, opts?)` | `Promise<Row[]>` | Query with filters, ordering, pagination |
 | `count(table, opts?)` | `Promise<number>` | Count matching rows |
+| `reward(table, id, scores)` | `Promise<void>` | Update reward scores (running average) on a row. Requires `rewardTracking: true` on the table; the engine sorts by reward at render time. `scores` is `Record<string, number>` with values in `[0, 1]`. |
 | `link(table, row)` | `Promise<Row>` | Insert into junction table (idempotent) |
 
 **Schema Methods:**
