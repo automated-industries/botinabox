@@ -204,6 +204,33 @@ await pipeline.processInbound(message);
 5. **Create task** -- inserts a task into the `TaskQueue` assigned to the resolved agent.
 6. **Emit `message.processed` hook** -- signals completion with the resolved agent and user IDs.
 
+### Slack-specific mutation hooks (`SlackBoltAdapter` only)
+
+When a Slack user edits or deletes a message in a channel the bot can see, `SlackBoltAdapter` emits one of two dedicated hook events. These are separate from `message.inbound` because the message body has already been persisted somewhere by the consumer; the mutation hooks let that consumer reflect the change:
+
+- **`slack.message.changed`** -- emitted when Slack delivers `message` with `subtype: 'message_changed'`. Payload:
+  ```typescript
+  {
+    channel: string;          // Slack channel ID (e.g. "C123ABC")
+    ts: string;               // original message ts (edits keep the same ts)
+    newBody: string;          // updated text
+    previousBody: string;     // pre-edit text
+    editorUser: string | null;
+    raw: Record<string, unknown>;  // full Slack event
+  }
+  ```
+- **`slack.message.deleted`** -- emitted when Slack delivers `message` with `subtype: 'message_deleted'`. Payload:
+  ```typescript
+  {
+    channel: string;
+    ts: string;               // original ts (from event.deleted_ts, falling back to previous_message.ts)
+    previousBody: string;
+    raw: Record<string, unknown>;
+  }
+  ```
+
+Both events are dispatched through the same `HookBus` instance passed to `SlackBoltAdapterConfig.hooks`. Do **not** open a second Bolt Socket Mode connection to subscribe to `message_changed` / `message_deleted` directly — Slack delivers any given `message` event to exactly one socket per app per event type, so a second-connection listener silently misses events.
+
 ### Agent-Channel Bindings
 
 Agents declare which channel they handle via their config:
