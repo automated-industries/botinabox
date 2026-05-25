@@ -82,6 +82,42 @@ export class SlackBoltAdapter {
     boltApp.event('message', async ({ event }: { event: Record<string, unknown> }) => {
       if (event.bot_id || event.app_id) return;
       const subtype = event.subtype as string | undefined;
+
+      // Mutation subtypes (edit + delete) get their own hook events so
+      // downstream callers can mirror Slack-side changes without
+      // running a second Bolt connection (which doesn't work — Socket
+      // Mode delivers `message` events to exactly one socket per app
+      // per event type, so a second-connection listener silently
+      // misses every event).
+      if (subtype === 'message_changed') {
+        const message = event.message as { ts?: string; text?: string; user?: string } | undefined;
+        const previousMessage = event.previous_message as { ts?: string; text?: string } | undefined;
+        const ts = message?.ts ?? previousMessage?.ts;
+        if (!ts) return;
+        await hooks.emit('slack.message.changed', {
+          channel: event.channel as string,
+          ts,
+          newBody: message?.text ?? '',
+          previousBody: previousMessage?.text ?? '',
+          editorUser: (message?.user as string | undefined) ?? null,
+          raw: event,
+        });
+        return;
+      }
+
+      if (subtype === 'message_deleted') {
+        const previousMessage = event.previous_message as { ts?: string; text?: string } | undefined;
+        const ts = (event.deleted_ts as string | undefined) ?? previousMessage?.ts;
+        if (!ts) return;
+        await hooks.emit('slack.message.deleted', {
+          channel: event.channel as string,
+          ts,
+          previousBody: previousMessage?.text ?? '',
+          raw: event,
+        });
+        return;
+      }
+
       if (subtype && subtype !== 'file_share') return;
 
       let inbound = parseSlackEvent(event as Parameters<typeof parseSlackEvent>[0]);

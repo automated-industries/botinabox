@@ -170,6 +170,108 @@ describe('SlackBoltAdapter — thread_ts forwarding', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Slack mutation events (subtype routing)
+  // -------------------------------------------------------------------------
+  describe('message_changed → slack.message.changed hook', () => {
+    it('emits slack.message.changed with new + previous body when subtype is message_changed', async () => {
+      const { hooks } = await startAdapter();
+      const messageHandler = mockBoltApp.event.mock.calls.find((c) => c[0] === 'message')?.[1];
+      expect(messageHandler).toBeDefined();
+
+      await messageHandler!({
+        event: {
+          type: 'message',
+          subtype: 'message_changed',
+          channel: 'C_PUBLIC',
+          message: { ts: '1700000000.000100', text: 'edited', user: 'U_EDITOR' },
+          previous_message: { ts: '1700000000.000100', text: 'original' },
+        },
+      });
+
+      expect(hooks.emit).toHaveBeenCalledWith('slack.message.changed', expect.objectContaining({
+        channel: 'C_PUBLIC',
+        ts: '1700000000.000100',
+        newBody: 'edited',
+        previousBody: 'original',
+        editorUser: 'U_EDITOR',
+      }));
+    });
+
+    it('does not emit when message_changed has no ts', async () => {
+      const { hooks } = await startAdapter();
+      const messageHandler = mockBoltApp.event.mock.calls.find((c) => c[0] === 'message')?.[1];
+
+      await messageHandler!({
+        event: {
+          type: 'message',
+          subtype: 'message_changed',
+          channel: 'C_PUBLIC',
+          message: { text: 'edited' },
+          previous_message: { text: 'original' },
+        },
+      });
+
+      expect(hooks.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('message_deleted → slack.message.deleted hook', () => {
+    it('emits slack.message.deleted with previous body when subtype is message_deleted', async () => {
+      const { hooks } = await startAdapter();
+      const messageHandler = mockBoltApp.event.mock.calls.find((c) => c[0] === 'message')?.[1];
+
+      await messageHandler!({
+        event: {
+          type: 'message',
+          subtype: 'message_deleted',
+          channel: 'C_PUBLIC',
+          deleted_ts: '1700000000.000100',
+          previous_message: { ts: '1700000000.000100', text: 'gone' },
+        },
+      });
+
+      expect(hooks.emit).toHaveBeenCalledWith('slack.message.deleted', expect.objectContaining({
+        channel: 'C_PUBLIC',
+        ts: '1700000000.000100',
+        previousBody: 'gone',
+      }));
+    });
+
+    it('falls back to previous_message.ts when deleted_ts is absent', async () => {
+      const { hooks } = await startAdapter();
+      const messageHandler = mockBoltApp.event.mock.calls.find((c) => c[0] === 'message')?.[1];
+
+      await messageHandler!({
+        event: {
+          type: 'message',
+          subtype: 'message_deleted',
+          channel: 'C_PUBLIC',
+          previous_message: { ts: '1700000000.000100', text: 'gone' },
+        },
+      });
+
+      expect(hooks.emit).toHaveBeenCalledWith('slack.message.deleted', expect.objectContaining({
+        ts: '1700000000.000100',
+      }));
+    });
+
+    it('does not emit when no ts is resolvable', async () => {
+      const { hooks } = await startAdapter();
+      const messageHandler = mockBoltApp.event.mock.calls.find((c) => c[0] === 'message')?.[1];
+
+      await messageHandler!({
+        event: {
+          type: 'message',
+          subtype: 'message_deleted',
+          channel: 'C_PUBLIC',
+        },
+      });
+
+      expect(hooks.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // file.deliver
   // -------------------------------------------------------------------------
   describe('file.deliver handler', () => {
