@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.13.1] — 2026-05-25
+
+### Changed
+
+- **Bump `latticesql` dep to `^1.11.0`.** Picks up the new `lattice gui` CLI command (local-only browser app for exploring Lattice data). No botinabox API change — this is a transparent dependency refresh. `lattice gui` is available to any project that has botinabox or latticesql installed.
+
+---
+
 ## [2.13.0] — 2026-05-22
 
 ### Added
