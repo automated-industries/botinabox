@@ -127,6 +127,8 @@ workflow.completed --> Your handler: notify stakeholders
 | `budget.exceeded` | `{ agentId, currentSpendCents, limitCents, warnPercent }` | BudgetController |
 | `message.inbound` | `{ message, channel }` | MessagePipeline |
 | `message.processed` | `{ message, channel, agentId, userId }` | MessagePipeline |
+| `slack.message.changed` | `{ channel, ts, newBody, previousBody, editorUser, raw }` | SlackBoltAdapter |
+| `slack.message.deleted` | `{ channel, ts, previousBody, raw }` | SlackBoltAdapter |
 | `workflow.completed` | `{ workflowRunId }` | WorkflowEngine |
 | `workflow.failed` | `{ workflowRunId, error }` | WorkflowEngine |
 | `schedule.fired` | `{ schedule_id, schedule_name, action, fired_at }` | Scheduler |
