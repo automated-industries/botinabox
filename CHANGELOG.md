@@ -6,6 +6,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.14.0] — 2026-05-25
+
+### Added
+
+- **`slack.message.changed` hook event** — emitted by `SlackBoltAdapter` when Slack delivers a `message` event with `subtype: 'message_changed'` (a user edited a message). Payload: `{ channel, ts, newBody, previousBody, editorUser, raw }`. Lets consumers mirror Slack-side edits into their own stores without running a second Bolt connection.
+- **`slack.message.deleted` hook event** — emitted by `SlackBoltAdapter` when Slack delivers a `message` event with `subtype: 'message_deleted'`. Payload: `{ channel, ts, previousBody, raw }`. Lets consumers soft-delete or remove mirrored rows when a user deletes a message in Slack.
+
+### Why
+
+`SlackBoltAdapter` previously dropped `message_changed` and `message_deleted` at the subtype filter (`if (subtype && subtype !== 'file_share') return;`), leaving consumers with no way to track edit/delete state. The intuitive workaround — open a second Bolt Socket Mode connection that subscribes to `message` events — doesn't work in practice, because Slack Socket Mode delivers any given `message` event to exactly one socket per app (per event type). The second-connection listener silently misses every event. Routing the subtypes through the existing `HookBus` is the only architecture that delivers events deterministically.
+
+### Notes for upgraders
+
+- Additive minor release. Existing `message.inbound` semantics are unchanged — `message_changed` / `message_deleted` events were already being dropped, so previous consumers see no behavior change. The two new hook events are opt-in.
+- Pattern:
+  ```typescript
+  hooks.register('slack.message.changed', async (ctx) => {
+    const { channel, ts, newBody } = ctx as { channel: string; ts: string; newBody: string };
+    // mirror the edit into your store
+  });
+  hooks.register('slack.message.deleted', async (ctx) => {
+    const { channel, ts } = ctx as { channel: string; ts: string };
+    // soft-delete the row keyed by (channel, ts)
+  });
+  ```
+- The hook bus is the same instance passed in `SlackBoltAdapterConfig.hooks`, so no new wiring is needed beyond `hooks.register`.
+
+---
+
 ## [2.13.1] — 2026-05-25
 
 ### Changed
