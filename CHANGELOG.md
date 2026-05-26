@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.15.2] — 2026-05-26
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.1` to `^1.13.2`.** Patch release with GUI fixes for the Postgres wizard form: autocapitalize/autocorrect/spellcheck disabled on text inputs, every text field trimmed on read, "Connect to existing cloud" copy rewritten to reflect switch-not-discard behavior, and `probeCloud` now surfaces SQLSTATE + driver routine in `result.error`. No API changes affecting `botinabox` itself.
+
+---
+
 ## [2.15.1] — 2026-05-26
 
 ### Changed
