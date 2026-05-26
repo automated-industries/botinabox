@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DataStore } from "../data-store.js";
 import { defineCoreTables } from "../core-schema.js";
 import { defineDomainTables } from "../domain-schema.js";
+import { defineDomainEntityContexts } from "../domain-entity-contexts.js";
 
 let db: DataStore;
 
@@ -93,6 +94,29 @@ describe("defineDomainTables", () => {
     expect(fetched!.amount_cents).toBe(500000);
   });
 
+  it("org table includes address column", () => {
+    const cols = db.tableInfo("org");
+    const address = cols.find((c) => c.name === "address");
+    expect(address, "org.address column should exist").toBeDefined();
+  });
+
+  it("org accepts nullable address and round-trips it", async () => {
+    const withAddr = await db.insert("org", {
+      name: "Org A",
+      type: "company",
+      address: "123 Example St, Suite 4",
+    });
+    const fetchedA = await db.get("org", withAddr.id as string);
+    expect(fetchedA!.address).toBe("123 Example St, Suite 4");
+
+    const withoutAddr = await db.insert("org", {
+      name: "Org B",
+      type: "company",
+    });
+    const fetchedB = await db.get("org", withoutAddr.id as string);
+    expect(fetchedB!.address).toBeNull();
+  });
+
   it("rule_org junction works", async () => {
     const org = await db.insert("org", { name: "Test", type: "company" });
     const rule = await db.insert("rule", {
@@ -105,5 +129,73 @@ describe("defineDomainTables", () => {
     await db.link("rule_org", { rule_id: rule.id, org_id: org.id });
     const links = await db.query("rule_org");
     expect(links.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("defineDomainEntityContexts — ORG.md renderer", () => {
+  let cdb: DataStore;
+
+  beforeEach(async () => {
+    cdb = new DataStore({ dbPath: ":memory:" });
+    defineCoreTables(cdb);
+    defineDomainTables(cdb);
+    defineDomainEntityContexts(cdb);
+    await cdb.init();
+  });
+
+  afterEach(() => {
+    cdb.close();
+  });
+
+  function getOrgRender(): (rows: any[]) => string {
+    const lattice: any = (cdb as any).lattice;
+    const ctx = lattice.entityContexts().get("org");
+    expect(ctx, "org entity context should be registered").toBeDefined();
+    const file = ctx.files["ORG.md"];
+    expect(file, "ORG.md file spec should be registered").toBeDefined();
+    expect(typeof file.render).toBe("function");
+    return file.render as (rows: any[]) => string;
+  }
+
+  it("emits Address line when address is set", () => {
+    const render = getOrgRender();
+    const out = render([
+      {
+        id: "o1",
+        name: "Demo Org",
+        type: "company",
+        website: "https://example.com",
+        address: "1 Example Way, City",
+      },
+    ]);
+    expect(out).toContain("**Address:** 1 Example Way, City");
+    expect(out).toContain("**Website:** https://example.com");
+  });
+
+  it("omits Address line when address is null", () => {
+    const render = getOrgRender();
+    const out = render([
+      {
+        id: "o1",
+        name: "Demo Org",
+        type: "company",
+        website: "https://example.com",
+        address: null,
+      },
+    ]);
+    expect(out).not.toContain("**Address:**");
+    expect(out).toContain("**Website:** https://example.com");
+  });
+
+  it("omits Address line when address column is missing entirely", () => {
+    const render = getOrgRender();
+    const out = render([
+      {
+        id: "o1",
+        name: "Demo Org",
+        type: "company",
+      },
+    ]);
+    expect(out).not.toContain("**Address:**");
   });
 });

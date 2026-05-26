@@ -60,6 +60,7 @@ export function defineDomainTables(
       description: "TEXT",
       mission: "TEXT",
       website: "TEXT",
+      address: "TEXT",
       created_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       updated_at: "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
       deleted_at: "TEXT",
