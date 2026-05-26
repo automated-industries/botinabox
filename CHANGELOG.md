@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.15.4] — 2026-05-26
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.3` to `^1.13.4`.** GUI-focused release: system-tables listing now works on Postgres, team-cloud upgrade persists the local connection row, password redacted in cloud-URL displays, role pill three-state (no more "UNKNOWN"), team operations work against direct-Postgres URLs (new `direct-ops.ts`), and the manual Sync button is removed from team cards (Lattice is realtime against its canonical store). No API changes affecting `botinabox` itself.
+
+---
+
 ## [2.15.3] — 2026-05-26
 
 ### Changed
