@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.15.3] — 2026-05-26
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.2` to `^1.13.3`.** Patch release with Postgres init crash fix (`DEFAULT ""` → `DEFAULT ''` on `__lattice_user_identity`), Postgres-direct register path for "Upgrade to team cloud", dashboard renders every entity (not just hardcoded list), structured DB switch errors with SQLSTATE, plus Migrate validate-on-save with Supabase URL pattern hints. No API changes affecting `botinabox` itself.
+
+---
+
 ## [2.15.2] — 2026-05-26
 
 ### Changed
