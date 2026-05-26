@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.15.0] — 2026-05-26
+
+### Changed
+
+- **Bumped `latticesql` from `^1.11.0` to `^1.13.0`.** The v1.13 release adds Lattice Teams (multi-user shared cloud DBs on BYO Postgres), native `secrets` + `files` entities with at-rest encryption, machine-local user config at `~/.lattice/`, and a Local → Cloud → Team-Cloud state-machine GUI. New public exports include `migrateLatticeData`, `archiveLocalSqlite`, `openTargetLatticeForMigration`, `probeCloud`, plus `TeamsClient.connectToExistingCloud` + `TeamsClient.upgradeToTeamCloud`.
+
+### Why
+
+Routine dependency bump to keep `botinabox` aligned with the latest latticesql release. No public API changes in botinabox itself; consumers picking up `botinabox@2.15.0` automatically get the v1.13 latticesql primitives.
+
+---
+
 ## [2.14.0] — 2026-05-25
 
 ### Added
