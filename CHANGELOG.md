@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.0] — 2026-05-26
+
+### Added
+
+- **`org.address` column** (nullable `TEXT`). Additive schema change mirroring the existing `client.address` convention in `defineDomainTables`. The `ORG.md` entity-context renderer now emits an `**Address:** ...` line when the column is populated and omits it when null. No migration required for existing tables on engines that allow additive nullable columns; consumers that already render organisations get the new line automatically once the data is set.
+
+---
+
 ## [2.15.4] — 2026-05-26
 
 ### Changed
