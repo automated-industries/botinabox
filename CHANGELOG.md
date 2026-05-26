@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.15.1] — 2026-05-26
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.0` to `^1.13.1`.** Patch release with GUI fixes for entity-context discovery (manifest fallback when contexts are registered programmatically), output-directory auto-detection, table-cell truncation, and a new public `Lattice.entityContexts()` accessor. No API changes affecting `botinabox` itself.
+
+---
+
 ## [2.15.0] — 2026-05-26
 
 ### Changed
