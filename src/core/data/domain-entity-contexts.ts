@@ -74,6 +74,7 @@ export function defineDomainEntityContexts(
             o.description ? `\n${o.description}` : null,
             o.mission ? `\n**Mission:** ${o.mission}` : null,
             o.website ? `**Website:** ${o.website}` : null,
+            o.address ? `**Address:** ${o.address}` : null,
             "",
           ]
             .filter(Boolean)
