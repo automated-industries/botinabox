@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.1] — 2026-05-26
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.4` to `^1.13.5`.** Patch release: `redeemInvite` now works against Postgres cloud URLs via the new `redeemInviteDirect()` path (fixes the "Join via invite" HTTP 404 on direct-Postgres clouds), and the Create-team / Join-team modals' cloud-URL placeholders now show a Postgres pooler URL example with autocapitalize-off. No API changes affecting `botinabox` itself.
+
+---
+
 ## [2.16.0] — 2026-05-26
 
 ### Added
