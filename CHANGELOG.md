@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.4] — 2026-05-27
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.7` to `^1.13.8`.** Minor release adds three GUI-side feature groups plus a documentation refresh. `botinabox` has no API surface that touches them directly — the bump is a passthrough so downstream consumers picking up `botinabox@2.16.4` also pick up the new GUI.
+  - **Realtime cloud subscriptions.** Cloud Postgres-backed lattices now stream changes to every connected GUI in realtime via a Postgres trigger on `__lattice_change_log` (`pg_notify('lattice_changes', …)`) and a Server-Sent Events endpoint at `GET /api/realtime/stream`. The browser invalidates the entity cache on every change; a green/yellow/red dot in the topbar reports cloud connection health. No-op on SQLite (LISTEN/NOTIFY is Postgres-only).
+  - **Cloud Database information-architecture refactor.** The GUI now treats every database as either Local (single-user SQLite) or Cloud (Postgres, one or more invited team members), with the database itself as the first-class concept. New three-step Create Database wizard, editable database name (collapses what was "team name"), header dropdown with friendly name + Local|Cloud kind chip + connectivity dot per row, settings sidebar reorganized into Lattice Settings + Database Settings + User Settings, per-table share checkboxes on the Migrate-to-Cloud modal, and a pre-checked "Share with cloud" box on the new-entity flow when cloud-connected. "Lattice Teams" remains the product/brand name; team verbiage stays for member management (Invite Team, Join Team, Team Members).
+  - **System tables toggle.** Internal `__lattice_*` / `_lattice_gui_*` tables are hidden from the sidebar by default. A new checkbox in User Settings → Preferences (persisted to `~/.lattice/preferences.json`) re-enables them. New endpoint `GET`/`POST /api/userconfig/preferences`.
+  - **Modal contrast + password redaction fixes.** Field labels and inputs in Join / Migrate / Create modals are now coherently styled regardless of browser theme. Password redaction in cloud URLs renders as ASCII `****` instead of percent-encoded bullets.
+  - Also picks up `@scarf/scarf` install analytics (opt-out) — anonymous npm-install metrics only; no runtime telemetry added.
+
+---
+
 ## [2.16.3] — 2026-05-27
 
 ### Changed
