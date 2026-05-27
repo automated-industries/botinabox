@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.3] — 2026-05-27
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.6` to `^1.13.7`.** Patch release: joining a team via the GUI is now seamless end-to-end. After invite redeem, the team's cloud URL is automatically saved as a switchable database credential, a sibling YAML config is written to the project directory, and the team's shared tables auto-register on `openConfig` via `syncSharedSchemas`. The user sees the new entry in the database dropdown as `<team-name>.config`, clicks it, and the SPA opens with the team's shared tables already populated — no YAML editing, no `db.define()` calls, no "No entities yet" message. No API changes affecting `botinabox` itself.
+
+---
+
 ## [2.16.2] — 2026-05-27
 
 ### Changed
