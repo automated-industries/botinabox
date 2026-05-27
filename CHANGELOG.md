@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.2] — 2026-05-27
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.5` to `^1.13.6`.** Patch release fixes the credential-URL crashes in Lattice Teams: `shareObject` / `unshareObject` / `listSharedObjects` / `me` / `linkRow` / `unlinkRow` / `drainOutbox` / `pullChanges` no longer fail with `Request cannot be constructed from a URL that includes credentials` when the operator's team cloud URL is a `postgres://user:password@host/db` connection string (the default after Migrate-to-cloud or Connect-to-existing-cloud). Also includes the joined-team dropdown integration: `saveDbCredentialForTeam` + a sibling YAML config are written on every successful invite redemption so the team's cloud DB shows up in the GUI's database switcher without manual config edits. No API changes affecting `botinabox` itself.
+
+---
+
 ## [2.16.1] — 2026-05-26
 
 ### Changed
