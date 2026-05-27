@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.5] — 2026-05-27
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.8` to `^1.13.9`.** Hotfix to v1.13.8: the new `RealtimeBroker` in `latticesql/src/gui/realtime.ts` used a top-level `import pg from 'pg'`, and the CLI tsup build did not list `pg` in `external`. tsup inlined pg's CommonJS internals (a `require('events')` shim + native-binding glue) into the ESM CLI bundle, crashing every `lattice gui` boot with `Dynamic require of 'events' is not supported` — even for SQLite-only configs that never construct a broker. v1.13.9 switches realtime.ts to a type-only `import type pg` plus a runtime `createRequire(import.meta.url)('pg')` lazy-load matching the existing pattern in `src/db/postgres.ts`, and adds `pg` to the CLI tsup `external` array as belt-and-suspenders. New regression test guards both the static source and the build config. No `botinabox` API changes.
+
+---
+
 ## [2.16.4] — 2026-05-27
 
 ### Changed
