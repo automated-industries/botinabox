@@ -17,7 +17,8 @@ import { createHash } from 'node:crypto';
 import type { DataStore } from '../data/data-store.js';
 import type { HookBus } from '../hooks/hook-bus.js';
 import type { InboundMessage } from './types.js';
-import type { ToolDefinition, ToolHandler, ToolContext } from '../orchestrator/execution-engine.js';
+import type { ToolDefinition, ToolHandler, ToolContext, ContextFile } from '../orchestrator/execution-engine.js';
+import { formatContextFilesBlock } from '../orchestrator/execution-engine.js';
 import type { SystemContextOptions } from '../data/context-builder.js';
 import type { Extractor } from './message-interpreter.js';
 import { MessageStore } from './message-store.js';
@@ -100,6 +101,23 @@ export interface ChatPipelineV2Config {
 
   /** Resolve file paths from DB-relative to absolute */
   resolveFilePath?: (path: string) => string;
+
+  /**
+   * Optional per-turn context resolver. Called once per inbound message with
+   * the resolved conversation coordinates. Returned files are wrapped in
+   * `<file path="...">...</file>` XML tags and appended to the system prompt
+   * AFTER the static `buildSystemContext` block. Intended for apps that want
+   * to inject per-conversation rendered context (e.g. reward-ranked entity or
+   * memory files) that is not already covered by `buildSystemContext`.
+   *
+   * The resolver owns all filesystem / database lookups — the pipeline does
+   * not touch the disk. If the resolver throws, the error propagates into the
+   * Phase-1 try/catch, which logs loudly and emits `pipeline.error`; there is
+   * no silent fallback to an empty context.
+   */
+  resolveContextFiles?: (
+    ctx: { channelId: string; threadId: string; userId?: string; messageText: string; channel: string },
+  ) => Promise<ContextFile[]> | ContextFile[];
 }
 
 const DEFAULT_DEDUP_WINDOW_MS = 5 * 60 * 1000;
@@ -225,6 +243,22 @@ export class ChatPipelineV2 {
         if (this.config.includeSystemContext !== false) {
           const ctx = await buildSystemContext(this.db, this.config.systemContextOptions);
           if (ctx) systemPrompt += `\n\n${ctx}`;
+        }
+
+        // Per-turn context files (e.g. reward-ranked entity/memory files).
+        // The resolver owns all I/O; the pipeline just concatenates what it
+        // gets back. A thrown resolver propagates to the outer catch and fails
+        // the turn loudly — no silent fallback to an empty context.
+        if (this.config.resolveContextFiles) {
+          const contextFiles = await this.config.resolveContextFiles({
+            channelId,
+            threadId: threadTs,
+            userId: msg.from,
+            messageText: msg.body,
+            channel: this.channel,
+          });
+          const contextFilesBlock = formatContextFilesBlock(contextFiles);
+          if (contextFilesBlock) systemPrompt += `\n\n${contextFilesBlock}`;
         }
 
         // ── Phase 2: THINK ─────────────────────────────────────
