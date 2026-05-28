@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.7] — 2026-05-28
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.9` to `^1.13.10`.** Passthrough: latticesql 1.13.10 removes the `@scarf/scarf` install-analytics dependency (it was structurally unable to report direct `npm install` events — Scarf's postinstall reads `scarfSettings.allowTopLevel` from the *consumer's* root manifest, not the dependency's) and replaces it with a passive README tracking pixel + public npm download stats. Net effect for `botinabox`: one fewer transitive dependency and a quieter install (no swallowed Scarf postinstall error). No `botinabox` API changes. (`package.json` was previously left at `2.16.5` on `main` while `2.16.6` shipped to npm via #31; this release reconciles the manifest forward to `2.16.7`.)
+
+---
+
 ## [2.16.6] — 2026-05-27
 
 ### Added
