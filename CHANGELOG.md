@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.6] — 2026-05-27
+
+### Added
+
+- **`resolveContextFiles` hook on `ChatPipelineV2Config`.** `ChatPipelineV2` can now inject host-resolved context files into the chat agent's system prompt per conversation turn, mirroring the existing `resolveContextFiles` option on `ExecutionEngineConfig`. When configured, the pipeline calls the resolver once per inbound message with `{ channelId, threadId, userId?, messageText, channel }`, wraps each returned `ContextFile` in `<file path="...">...</file>` tags via the shared `formatContextFilesBlock()` helper, and appends the non-empty block to the system prompt **after** the `buildSystemContext` block. The resolver owns all I/O — the pipeline never touches the filesystem — and a thrown resolver propagates into the Phase-1 try/catch (logs loudly, emits `pipeline.error`); there is no silent empty-context fallback. Omitting the option leaves `ChatPipelineV2` behavior byte-identical. Typical use: injecting per-conversation rendered context (e.g. reward-ranked entity/memory files) that `buildSystemContext` does not already cover.
+
+---
+
 ## [2.16.5] — 2026-05-27
 
 ### Changed
