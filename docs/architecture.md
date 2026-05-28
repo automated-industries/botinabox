@@ -411,6 +411,16 @@ resolveContextFiles?: (
 
 The engine calls the resolver once per task pickup, wraps each returned file in `<file path="...">...</file>` XML tags via the exported `formatContextFilesBlock()` helper, and inserts the block into the system prompt between the static `buildSystemContext` output and the tool listing. The resolver owns all filesystem and database reads — the engine does no I/O of its own — and thrown errors propagate up to fail the task loudly with no silent fallback. Typical uses: injecting rendered per-agent rules, per-project playbooks, or shared CLAUDE.md-style platform documents into the system prompt without hard-coding them in the engine.
 
+**Chat-pipeline equivalent.** `ChatPipelineV2` exposes the same hook on its `ChatPipelineV2Config`, scoped to a conversation turn rather than a task pickup:
+
+```ts
+resolveContextFiles?: (
+  ctx: { channelId: string; threadId: string; userId?: string; messageText: string; channel: string }
+) => Promise<ContextFile[]> | ContextFile[];
+```
+
+When configured, the pipeline calls the resolver once per inbound message, formats the returned files with the same `formatContextFilesBlock()` helper, and appends the non-empty block to the system prompt **after** the `buildSystemContext` block. The resolver owns all I/O — the pipeline never reads the filesystem — and a thrown resolver propagates into the Phase-1 try/catch, which logs loudly and emits `pipeline.error` (no silent empty-context fallback). Omitting `resolveContextFiles` leaves the assembled system prompt byte-identical to before. Typical uses: injecting per-conversation reward-ranked entity or memory files that `buildSystemContext` does not already cover.
+
 **Ephemeral system-prompt caching.** Set `cacheSystemPrompt: true` on the `ExecutionEngineConfig` to let Anthropic's prompt cache serve hits across calls within the 5-minute ephemeral TTL:
 
 ```ts

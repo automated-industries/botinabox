@@ -498,6 +498,121 @@ describe('ChatPipelineV2 — Primary Agent Architecture', () => {
     });
   });
 
+  describe('resolveContextFiles (per-turn context injection)', () => {
+    it('appends resolved files as <file path=...> tags to the system prompt', async () => {
+      let capturedSystem: string | undefined;
+      const llmCall = async (params: Record<string, unknown>) => {
+        if (capturedSystem === undefined) capturedSystem = params.system as string;
+        return {
+          content: [{ type: 'text', text: 'ok' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        resolveContextFiles: () => [
+          { path: '/ctx/rules.md', content: 'RULE ONE' },
+          { path: '/ctx/agent.md', content: 'AGENT BODY' },
+        ],
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('hello') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(capturedSystem).toBeDefined();
+      expect(capturedSystem).toContain('<file path="/ctx/rules.md">');
+      expect(capturedSystem).toContain('RULE ONE');
+      expect(capturedSystem).toContain('<file path="/ctx/agent.md">');
+      expect(capturedSystem).toContain('AGENT BODY');
+    });
+
+    it('passes the conversation coordinates to the resolver', async () => {
+      let seenCtx: Record<string, unknown> | undefined;
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2() as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        resolveContextFiles: (ctx) => {
+          seenCtx = ctx as unknown as Record<string, unknown>;
+          return [];
+        },
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('what is up', {
+        account: 'C_CTX',
+        threadId: '1776.0001',
+        from: 'user-42',
+      }) as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(seenCtx).toBeDefined();
+      expect(seenCtx).toMatchObject({
+        channelId: 'C_CTX',
+        threadId: '1776.0001',
+        userId: 'user-42',
+        messageText: 'what is up',
+        channel: 'slack',
+      });
+    });
+
+    it('leaves the system prompt unchanged when resolveContextFiles is omitted', async () => {
+      let capturedSystem: string | undefined;
+      const llmCall = async (params: Record<string, unknown>) => {
+        if (capturedSystem === undefined) capturedSystem = params.system as string;
+        return {
+          content: [{ type: 'text', text: 'ok' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('hello') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(capturedSystem).toBe('Test');
+      expect(capturedSystem).not.toContain('<file path=');
+    });
+
+    it('surfaces a thrown resolver as a pipeline error without crashing silently', async () => {
+      const pipelineErrors: Record<string, unknown>[] = [];
+      hooks.register('pipeline.error', (ctx) => { pipelineErrors.push(ctx); });
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2() as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        resolveContextFiles: () => { throw new Error('resolver boom'); },
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      // Should NOT throw out of the pipeline
+      await hooks.emit('message.inbound', makeMessage('hello') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // The failure surfaced loudly via pipeline.error
+      expect(pipelineErrors.length).toBeGreaterThanOrEqual(1);
+      expect(pipelineErrors[0]!.error).toContain('resolver boom');
+    });
+  });
+
   describe('thread resolution (regression)', () => {
     it('resolves threadTs to msg.threadId when both threadId and account are set', async () => {
       const responses: Record<string, unknown>[] = [];
