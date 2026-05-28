@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.8] — 2026-05-28
+
+### Changed
+
+- **Bumped `latticesql` from `^1.13.10` to `^1.14.0`.** Passthrough: latticesql 1.14.0 ships the team-cloud per-table ownership model (each table records its creator; members see only tables they own plus tables explicitly shared to the team, with native `files`/`secrets` private to the database creator by default), membership-driven team-cloud state, owner-only member admin, and the consolidated browser GUI (Data Model inside Database Settings). It also restores the `@scarf/scarf` install-analytics dependency. No `botinabox` API changes — this is a dependency-sync release.
+
+---
+
 ## [2.16.7] — 2026-05-28
 
 ### Changed
