@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.9] — 2026-05-29
+
+### Changed
+
+- **Bumped `latticesql` from `^1.14.0` to `^1.15.0`.** Passthrough: latticesql 1.15.0 ships Teams data-integrity fixes — `seed()` surfaces unresolved junction links instead of silently dropping them; the team dead-letter queue is now inspectable/retryable/purgeable via `teams dlq`; non-owner local edits are captured as divergence entries instead of being silently overwritten on pull — plus a GUI delete-database flow, bounded `/api/entities` row counts (no more connection-pool exhaustion on large cloud schemas), and Windows fixes for `postgres://` databases + portable `db:` paths. No `botinabox` API changes — dependency-sync release.
+
+---
+
 ## [2.16.8] — 2026-05-28
 
 ### Changed
