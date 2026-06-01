@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.11] — 2026-06-01
+
+### Changed
+
+- **Bumped `latticesql` from `^1.15.0` to `^1.16.0`.** Passthrough: latticesql 1.16.0 backports the non-AI 2.0 feature set onto the stable 1.x line — the `.lattice` workspace model + auto-render, full-text search (`fullTextSearch`, SQLite FTS5 / Postgres `tsvector` with a LIKE fallback), changelog/version history, sources/references, a workspace dashboard, and a multiplayer cloud-editing experience (live share/de-share, "last edited by", change-flash + counts, offline edit queue) — all with no AI dependency, plus a much richer GUI Data Model editor (force-directed schema graph, bidirectional many-to-many links, and a soft-delete model where every schema change is tracked in version history and reversible, with session-scoped undo/redo). A bare `new Lattice(path)` library consumer (which is how `botinabox` uses it) keeps a zero-overhead `^1.x` contract — all new surface is opt-in or GUI-cloud-gated. No `botinabox` API changes — dependency-sync release.
+
+---
+
 ## [2.16.10] — 2026-06-01
 
 ### Fixed — `run.completed` event now carries `output` + `durationMs`, restoring observability for failed runs
