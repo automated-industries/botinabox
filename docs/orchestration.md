@@ -264,7 +264,10 @@ await runs.finishRun(runId, {
   model: 'claude-sonnet-4-20250514',   // Written to runs.model
   provider: 'anthropic',               // Forwarded to run.completed hook
 });
-// Emits: 'run.completed' { runId, agentId, taskId, status, exitCode, model, provider, usage }
+// Emits: 'run.completed' { runId, agentId, taskId, status, exitCode, output, durationMs, model, provider, usage }
+//   - output:     the agent's final text on success; the error string passed via result.output on failure (e.g. 'Execution error: …'). Added in 2.16.10.
+//   - durationMs: computed from runs.started_at (set by startRun) → now. Added in 2.16.10.
+//   - On any non-zero exitCode, a '[run-manager] finishRun failure …' warning is also written to stderr.
 ```
 
 ### Retry with Exponential Backoff
