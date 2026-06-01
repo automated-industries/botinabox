@@ -164,12 +164,47 @@ export class RunManager {
       }
     }
 
+    // Belt-and-suspenders log for any non-zero exit. Without this, agents
+    // that crash with a swallowed error leave behind empty observation
+    // rows (raw_text='', error_message=null on the observation pipeline)
+    // and downstream operators have nothing to diagnose with. The output
+    // string ends up in runs.error_message via the UPDATE above, but
+    // hosts that grep their stdout for failures need the line here.
+    if (!succeeded) {
+      const truncated = result.output
+        ? result.output.length > 500
+          ? `${result.output.slice(0, 500)}…(truncated, ${result.output.length} chars)`
+          : result.output
+        : '<empty>';
+      console.warn(
+        `[run-manager] finishRun failure runId=${runId} agentId=${agentId} ` +
+          `taskId=${taskId} exitCode=${result.exitCode} ` +
+          `model=${result.model ?? 'unknown'} output=${JSON.stringify(truncated)}`,
+      );
+    }
+
+    // Compute duration from started_at (set by startRun) to now. Both are
+    // ISO strings in this codebase. Forwarded on the event so downstream
+    // metrics (e.g. task_duration_ms histogram) can observe without
+    // re-reading the runs row.
+    const startedAtIso = run['started_at'] as string | undefined;
+    const durationMs = startedAtIso
+      ? Math.max(0, Date.now() - new Date(startedAtIso).getTime())
+      : undefined;
+
     await this.hooks.emit('run.completed', {
       runId,
       agentId,
       taskId,
       status,
       exitCode: result.exitCode,
+      // Forwarded so the observation pipeline (and any other consumer
+      // reading ctx.output) gets the error text from finishRun's catch
+      // path. Without this, every dispatch failure produces an empty
+      // raw_text on its observation row and a null error_message visible
+      // to operators — the exact failure mode this commit fixes.
+      output: result.output,
+      durationMs,
       model: result.model,
       provider: result.provider,
       usage: result.usage,

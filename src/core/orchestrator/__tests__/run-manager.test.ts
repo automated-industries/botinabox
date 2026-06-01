@@ -121,6 +121,71 @@ describe('RunManager — Story 3.3', () => {
     expect(usage['outputTokens']).toBe(50);
   });
 
+  it('finishRun forwards output on run.completed (regression for empty raw_text on failed runs)', async () => {
+    // Bug: prior to this fix, finishRun emitted run.completed without
+    // `output`, so every downstream consumer reading ctx.output got
+    // undefined → coerced to '' in the observation pipeline. The error
+    // text was written to runs.error_message via the UPDATE but lost on
+    // the event. Symptom: agent-execution observations had raw_text='',
+    // dispatch failures were operationally invisible.
+    const events: Record<string, unknown>[] = [];
+    hooks.register('run.completed', (ctx) => { events.push(ctx); });
+    const runId = await manager.startRun('agent-1', 'task-1');
+    await manager.finishRun(runId, {
+      exitCode: 1,
+      output: 'Execution error: boom',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]!['output']).toBe('Execution error: boom');
+    expect(events[0]!['status']).toBe('failed');
+    expect(events[0]!['exitCode']).toBe(1);
+  });
+
+  it('finishRun forwards durationMs on run.completed', async () => {
+    const events: Record<string, unknown>[] = [];
+    hooks.register('run.completed', (ctx) => { events.push(ctx); });
+    const runId = await manager.startRun('agent-1', 'task-1');
+    // Small delay so durationMs is non-zero rather than relying on clock skew.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await manager.finishRun(runId, { exitCode: 0, output: 'ok' });
+    expect(events).toHaveLength(1);
+    const dur = events[0]!['durationMs'] as number;
+    expect(typeof dur).toBe('number');
+    expect(dur).toBeGreaterThanOrEqual(10);
+    expect(dur).toBeLessThan(5_000);
+  });
+
+  it('finishRun logs a warning to stderr on non-zero exit (so swallowed failures stay visible)', async () => {
+    const warns: unknown[][] = [];
+    const orig = console.warn;
+    console.warn = (...args: unknown[]) => { warns.push(args); };
+    try {
+      const runId = await manager.startRun('agent-1', 'task-1');
+      await manager.finishRun(runId, { exitCode: 1, output: 'Execution error: missing tool' });
+    } finally {
+      console.warn = orig;
+    }
+    expect(warns).toHaveLength(1);
+    const line = warns[0]!.join(' ');
+    expect(line).toMatch(/\[run-manager\]/);
+    expect(line).toMatch(/finishRun failure/);
+    expect(line).toMatch(/exitCode=1/);
+    expect(line).toMatch(/Execution error: missing tool/);
+  });
+
+  it('finishRun does NOT log a warning on successful exit', async () => {
+    const warns: unknown[][] = [];
+    const orig = console.warn;
+    console.warn = (...args: unknown[]) => { warns.push(args); };
+    try {
+      const runId = await manager.startRun('agent-1', 'task-1');
+      await manager.finishRun(runId, { exitCode: 0, output: 'ok' });
+    } finally {
+      console.warn = orig;
+    }
+    expect(warns).toHaveLength(0);
+  });
+
   it('reapOrphans marks stale running runs as failed', async () => {
     // Insert a run directly with a very old started_at
     const row = await db.insert('runs', {
