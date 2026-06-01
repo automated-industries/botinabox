@@ -6,6 +6,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.10] — 2026-06-01
+
+### Fixed — `run.completed` event now carries `output` + `durationMs`, restoring observability for failed runs
+
+`RunManager.finishRun` emitted the `run.completed` event without `output` or `durationMs` on its payload — so every downstream hook reading `ctx.output` got `undefined`, and consumers that wanted the agent's final text (e.g. observation pipelines, metrics with task duration) had to re-fetch from the `runs` row themselves. The error text was correctly persisted to `runs.error_message` via the `db.update` in `finishRun`, but it never reached the event consumers.
+
+Symptom in a real deployment: every dispatched-agent failure produced an empty observation row (`raw_text=''`) and the actual error string was effectively invisible to operators — the agent loop fired Anthropic calls, the CLI/API adapter caught its exception and called `finishRun({ exitCode: 1, output: 'Execution error: …' })`, but the error text dropped out of the event and the observation pipeline persisted nothing useful. Dispatch failures were operationally undiagnosable.
+
+This release:
+
+- **`run.completed` payload now includes `output`** (the agent's final text on success, or the error string from the execution adapter's catch path on failure) **and `durationMs`** (computed from `runs.started_at` → now). The shape is additive — downstream consumers that previously ignored these fields are unaffected.
+- **Adds a stderr warning line on any non-zero exit code** (`[run-manager] finishRun failure runId=… agentId=… taskId=… exitCode=… model=… output=…`). Belt-and-suspenders so future observation-pipeline bugs can't silently hide a failed dispatch — the line is greppable in container logs even when downstream consumers swallow.
+- New regression tests in `src/core/orchestrator/__tests__/run-manager.test.ts` pin both invariants: `output` and `durationMs` are forwarded on the event; the warning fires on `exitCode !== 0` and does not fire on success.
+
+No API changes; this is strictly additive event payload + a log line. Downstream consumers that want the new fields can opt in by reading `ctx.output` / `ctx.durationMs` on their `run.completed` hook.
+
+---
+
 ## [2.16.9] — 2026-05-29
 
 ### Changed

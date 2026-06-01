@@ -123,7 +123,7 @@ workflow.completed --> Your handler: notify stakeholders
 | `agent.terminated` | `{ agentId }` | AgentRegistry |
 | `task.created` | `{ taskId, title }` | TaskQueue |
 | `task.followup.created` | `{ originTaskId, followupAgentId, chainDepth }` | RunManager |
-| `run.completed` | `{ runId, agentId, taskId, status, exitCode }` | RunManager |
+| `run.completed` | `{ runId, agentId, taskId, status, exitCode, output, durationMs, model, provider, usage }` | RunManager |
 | `budget.exceeded` | `{ agentId, currentSpendCents, limitCents, warnPercent }` | BudgetController |
 | `message.inbound` | `{ message, channel }` | MessagePipeline |
 | `message.processed` | `{ message, channel, agentId, userId }` | MessagePipeline |
