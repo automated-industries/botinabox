@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.14] — 2026-06-02
+
+### Changed
+
+- **Bumped `latticesql` from `^1.16.2` to `^1.16.3`.** Passthrough: latticesql 1.16.3 is a GUI patch that reframes a cloud database as a cloud workspace with members (the separate "upgrade to team" step is retired and the member/share machinery now initializes automatically), fixes a long-form inline-editor data-corruption bug (long-form fields open a `<textarea>` so newlines round-trip and a no-op click+blur no longer rewrites the value), adds data-model graph share-status coloring + a legend and pending invitees in the member list, makes cloud sharing actually persist, renames "Database" → "Workspace" in the UI, and ships assorted settings/empty-state polish. No library API changes — a bare `new Lattice(path)` consumer (how `botinabox` uses it) is unaffected. Dependency-sync release; no `botinabox` API changes.
+
 ## [2.16.13] — 2026-06-02
 
 ### Changed
