@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.12] — 2026-06-02
+
+### Changed
+
+- **Bumped `latticesql` from `^1.16.0` to `^1.16.1`.** Passthrough: latticesql 1.16.1 is a GUI bug-fix + polish patch (redo gate counts session-scoped; built-in-entity column edits no longer corrupt the schema; failed writes surface instead of phantom success; the "+ New workspace…" button opens its input; one-to-many links labeled legacy with a `ref:` deprecation warning; the standalone Activity rail removed). No library API changes — a bare `new Lattice(path)` consumer (how `botinabox` uses it) is unaffected. Dependency-sync release; no `botinabox` API changes.
+
 ## [2.16.11] — 2026-06-01
 
 ### Changed
