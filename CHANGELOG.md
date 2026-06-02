@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.13] — 2026-06-02
+
+### Changed
+
+- **Bumped `latticesql` from `^1.16.1` to `^1.16.2`.** Passthrough: latticesql 1.16.2 is a GUI bug-fix + cloud-settings patch (Version History no longer shows "Invalid Date"; an already-joined cloud member is no longer shown the "needs invite" panel; owner invite shows a password-redacted connection string; member-exit actions moved to a Danger Zone with Disconnect/Leave; the simple view gained an in-place create form; clicking a database row switches to it; the dashboard "Recent Activity" section was removed). No library API changes — a bare `new Lattice(path)` consumer (how `botinabox` uses it) is unaffected. Dependency-sync release; no `botinabox` API changes.
+
 ## [2.16.12] — 2026-06-02
 
 ### Changed
