@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.15] — 2026-06-02
+
+### Changed
+
+- **Bumped `latticesql` from `^1.16.3` to `^1.16.4`.** Passthrough: latticesql 1.16.4 is a GUI patch — one unified workspace model (a workspace _is_ a Lattice DB; single header switcher; the `.lattice` root is universal for the GUI and the no-root "database mode" is gone), cloud-path fixes ("New cloud (Postgres)" works via direct Postgres registration; the standalone "connect to an existing cloud" path is removed in favor of migrate-to-cloud or join-via-invite; owner-only cloud-workspace delete), and two sharing fixes — shared tables are now visible to members (a shared table that already physically exists is registered locally) and inviting a member again offers per-table share checkboxes (all checked by default). No library API changes — a bare `new Lattice(path)` consumer (how `botinabox` uses it) is unaffected. Dependency-sync release; no `botinabox` API changes.
+
 ## [2.16.14] — 2026-06-02
 
 ### Changed
