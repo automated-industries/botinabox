@@ -152,12 +152,24 @@ export class SlackBoltAdapter {
       const formatted = formatForSlack(text);
       const chunks = chunkText(formatted, 3800);
       for (const chunk of chunks) {
-        await boltApp.client.chat.postMessage({
+        const res = await boltApp.client.chat.postMessage({
           token: botToken,
           channel: channelId,
           text: chunk,
           ...(isValidSlackThreadTs(threadId) ? { thread_ts: threadId } : {}),
         });
+        // Expose the posted message's ts so downstream callers can later
+        // resolve reactions/edits back to the message the bot sent — the
+        // Socket Mode transport otherwise has no record of outbound ts.
+        const ts = (res as { ts?: string })?.ts;
+        if (ts) {
+          await hooks.emit('slack.message.outbound', {
+            channel: channelId,
+            ts,
+            threadTs: isValidSlackThreadTs(threadId) ? threadId : null,
+            body: chunk,
+          });
+        }
       }
     }, { priority: 90 });
 

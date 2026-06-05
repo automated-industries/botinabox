@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.16] — 2026-06-05
+
+### Added
+
+- **`slack.message.outbound` hook event** — emitted by `SlackBoltAdapter` after each chunk the bot posts in the `response.ready` handler, carrying the posted message's Slack `ts`. Payload: `{ channel, ts, threadTs, body }` (`threadTs` is `null` for a top-level reply). On the Socket Mode transport the outbound `ts` was previously discarded, so consumers had no way to resolve a later reaction or edit back to the message the bot sent. This completes the trio alongside `slack.message.changed` / `slack.message.deleted`. No emission when `chat.postMessage` returns no `ts`.
+
 ## [2.16.15] — 2026-06-02
 
 ### Changed

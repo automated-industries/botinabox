@@ -129,6 +129,7 @@ workflow.completed --> Your handler: notify stakeholders
 | `message.processed` | `{ message, channel, agentId, userId }` | MessagePipeline |
 | `slack.message.changed` | `{ channel, ts, newBody, previousBody, editorUser, raw }` | SlackBoltAdapter |
 | `slack.message.deleted` | `{ channel, ts, previousBody, raw }` | SlackBoltAdapter |
+| `slack.message.outbound` | `{ channel, ts, threadTs, body }` | SlackBoltAdapter |
 | `workflow.completed` | `{ workflowRunId }` | WorkflowEngine |
 | `workflow.failed` | `{ workflowRunId, error }` | WorkflowEngine |
 | `schedule.fired` | `{ schedule_id, schedule_name, action, fired_at }` | Scheduler |
