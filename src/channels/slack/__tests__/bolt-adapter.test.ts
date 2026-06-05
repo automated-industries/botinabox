@@ -167,6 +167,44 @@ describe('SlackBoltAdapter — thread_ts forwarding', () => {
 
       expect(postMessageSpy).not.toHaveBeenCalled();
     });
+
+    it('emits slack.message.outbound with the posted ts after delivering a chunk', async () => {
+      const { hooks } = await startAdapter();
+      const handler = registeredHooks['response.ready'];
+
+      await handler({ threadId: '1617000000.000001', text: 'Hello', taskId: undefined });
+
+      expect(hooks.emit).toHaveBeenCalledWith('slack.message.outbound', {
+        channel: 'C123456',
+        ts: '9999.0001',
+        threadTs: '1617000000.000001',
+        body: 'Hello',
+      });
+    });
+
+    it('uses null threadTs in slack.message.outbound when threadId is not a thread ts', async () => {
+      const { hooks } = await startAdapter();
+      const handler = registeredHooks['response.ready'];
+
+      await handler({ threadId: undefined, text: 'Top-level reply', taskId: undefined });
+
+      expect(hooks.emit).toHaveBeenCalledWith('slack.message.outbound', {
+        channel: 'C123456',
+        ts: '9999.0001',
+        threadTs: null,
+        body: 'Top-level reply',
+      });
+    });
+
+    it('does not emit slack.message.outbound when postMessage returns no ts', async () => {
+      postMessageSpy.mockResolvedValueOnce({ ok: true });
+      const { hooks } = await startAdapter();
+      const handler = registeredHooks['response.ready'];
+
+      await handler({ threadId: '1617000000.000001', text: 'Hello', taskId: undefined });
+
+      expect(hooks.emit).not.toHaveBeenCalledWith('slack.message.outbound', expect.anything());
+    });
   });
 
   // -------------------------------------------------------------------------
