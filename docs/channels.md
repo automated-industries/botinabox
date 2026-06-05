@@ -228,8 +228,17 @@ When a Slack user edits or deletes a message in a channel the bot can see, `Slac
     raw: Record<string, unknown>;
   }
   ```
+- **`slack.message.outbound`** -- emitted after each chunk the bot posts in the `response.ready` handler, carrying the posted message's `ts`. On the Socket Mode transport the outbound `ts` is otherwise discarded, so this is the only way for a consumer to resolve a later reaction or edit back to the message the bot sent. Not emitted when `chat.postMessage` returns no `ts`. Payload:
+  ```typescript
+  {
+    channel: string;          // resolved Slack channel ID the message was posted to
+    ts: string;               // ts of the message the bot just posted
+    threadTs: string | null;  // thread ts if posted in a thread, else null
+    body: string;             // the chunk text that was posted
+  }
+  ```
 
-Both events are dispatched through the same `HookBus` instance passed to `SlackBoltAdapterConfig.hooks`. Do **not** open a second Bolt Socket Mode connection to subscribe to `message_changed` / `message_deleted` directly — Slack delivers any given `message` event to exactly one socket per app per event type, so a second-connection listener silently misses events.
+These events are dispatched through the same `HookBus` instance passed to `SlackBoltAdapterConfig.hooks`. Do **not** open a second Bolt Socket Mode connection to subscribe to `message_changed` / `message_deleted` directly — Slack delivers any given `message` event to exactly one socket per app per event type, so a second-connection listener silently misses events.
 
 ### Agent-Channel Bindings
 

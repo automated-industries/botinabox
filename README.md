@@ -160,7 +160,7 @@ Cross-cutting concerns -- **HookBus** (events), **DataStore** (persistence), **S
 
 ## Core Concepts
 
-**HookBus** is the central event bus. Handlers subscribe to named events with optional priority ordering and payload filters. Errors in one handler never block others. Use it to decouple layers -- the task queue emits `task.created`, the run manager emits `run.completed`, channels emit `message.inbound` (and Slack additionally emits `slack.message.changed` / `slack.message.deleted` when users edit or delete messages), and your application code listens to whichever events it needs.
+**HookBus** is the central event bus. Handlers subscribe to named events with optional priority ordering and payload filters. Errors in one handler never block others. Use it to decouple layers -- the task queue emits `task.created`, the run manager emits `run.completed`, channels emit `message.inbound` (and Slack additionally emits `slack.message.changed` / `slack.message.deleted` when users edit or delete messages, plus `slack.message.outbound` carrying the posted `ts` after the bot sends a message), and your application code listens to whichever events it needs.
 
 **DataStore** wraps [latticesql](https://github.com/automated-industries/lattice) to provide schema-driven SQLite persistence. You call `db.define()` to register table schemas, then `db.init()` to create them. It supports insert, update, upsert, get, query, delete, reward (usefulness-weighted render ordering, opt-in via `rewardTracking`), and migrations. WAL mode is enabled by default for concurrent read access.
 
