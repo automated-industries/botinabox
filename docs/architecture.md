@@ -422,6 +422,16 @@ resolveContextFiles?: (
 
 When configured, the pipeline calls the resolver once per inbound message, formats the returned files with the same `formatContextFilesBlock()` helper, and appends the non-empty block to the system prompt **after** the `buildSystemContext` block. The resolver owns all I/O — the pipeline never reads the filesystem — and a thrown resolver propagates into the Phase-1 try/catch, which logs loudly and emits `pipeline.error` (no silent empty-context fallback). Omitting `resolveContextFiles` leaves the assembled system prompt byte-identical to before. Typical uses: injecting per-conversation reward-ranked entity or memory files that `buildSystemContext` does not already cover.
 
+**Per-turn tool context.** `ChatPipelineV2` exposes a companion `resolveToolContext` hook on its `ChatPipelineV2Config`, called with the same per-turn coordinates but used to enrich tool execution rather than the system prompt:
+
+```ts
+resolveToolContext?: (
+  ctx: { channelId: string; threadId: string; userId?: string; messageText: string; channel: string }
+) => Promise<Record<string, unknown>> | Record<string, unknown>;
+```
+
+The pipeline calls it once per inbound message and merges the returned fields into the `ToolContext` handed to every tool handler for that turn. The base context fields (`taskId`, `agentId`, `hooks`, `db`, `resolveFilePath`) are applied **after** the resolver's output, so a resolver can never override them — colliding keys are ignored. A thrown resolver propagates into the Phase-1 try/catch and fails the turn loudly via `pipeline.error` (no silent fallback). Omitting `resolveToolContext` leaves the `ToolContext` minimal and unchanged. The primary agent always runs under the static `agentId: 'primary'`; this hook is how an app threads per-turn identity that the static config cannot express — e.g. resolving *which user the primary agent is acting on behalf of* from `userId`, so a tool handler can act against that user's connected accounts.
+
 **Ephemeral system-prompt caching.** Set `cacheSystemPrompt: true` on the `ExecutionEngineConfig` to let Anthropic's prompt cache serve hits across calls within the 5-minute ephemeral TTL:
 
 ```ts

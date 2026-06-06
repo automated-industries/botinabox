@@ -613,6 +613,111 @@ describe('ChatPipelineV2 — Primary Agent Architecture', () => {
     });
   });
 
+  describe('resolveToolContext (per-turn tool identity injection)', () => {
+    function captureCtxTool(sink: { ctx?: Record<string, unknown> }) {
+      return {
+        definition: {
+          name: 'probe',
+          description: 'probe tool',
+          input_schema: { type: 'object', properties: {} },
+        },
+        handler: async (_input: Record<string, unknown>, ctx: Record<string, unknown>) => {
+          sink.ctx = ctx;
+          return 'ok';
+        },
+      };
+    }
+
+    it('merges resolver fields into the ToolContext handed to tool handlers', async () => {
+      const sink: { ctx?: Record<string, unknown> } = {};
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2({ toolCall: { name: 'probe', input: {} } }) as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        tools: [captureCtxTool(sink)],
+        resolveToolContext: (ctx) => ({ gmailAgentSlug: `agent-for-${ctx.userId}`, gmailCrossUser: true }),
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('book it', { from: 'user-42' }) as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(sink.ctx).toBeDefined();
+      expect(sink.ctx!.gmailAgentSlug).toBe('agent-for-user-42');
+      expect(sink.ctx!.gmailCrossUser).toBe(true);
+      // Base fields still present
+      expect(sink.ctx!.agentId).toBe('primary');
+      expect(sink.ctx!.db).toBeDefined();
+      expect(sink.ctx!.hooks).toBeDefined();
+    });
+
+    it('never lets the resolver override base ToolContext fields', async () => {
+      const sink: { ctx?: Record<string, unknown> } = {};
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2({ toolCall: { name: 'probe', input: {} } }) as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        tools: [captureCtxTool(sink)],
+        // Malicious/buggy resolver tries to clobber identity + db
+        resolveToolContext: () => ({ agentId: 'spoofed', taskId: 'spoofed', db: null }),
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('book it') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(sink.ctx).toBeDefined();
+      expect(sink.ctx!.agentId).toBe('primary');
+      expect(sink.ctx!.taskId).toBe('');
+      expect(sink.ctx!.db).not.toBeNull();
+    });
+
+    it('leaves the ToolContext minimal when resolveToolContext is omitted', async () => {
+      const sink: { ctx?: Record<string, unknown> } = {};
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2({ toolCall: { name: 'probe', input: {} } }) as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        tools: [captureCtxTool(sink)],
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('book it') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(sink.ctx).toBeDefined();
+      expect(sink.ctx!.agentId).toBe('primary');
+      expect(sink.ctx!.gmailAgentSlug).toBeUndefined();
+    });
+
+    it('surfaces a thrown resolveToolContext as a pipeline error without crashing silently', async () => {
+      const pipelineErrors: Record<string, unknown>[] = [];
+      hooks.register('pipeline.error', (ctx) => { pipelineErrors.push(ctx); });
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: mockLlmCallV2({ toolCall: { name: 'probe', input: {} } }) as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        tools: [captureCtxTool({})],
+        resolveToolContext: () => { throw new Error('tool ctx boom'); },
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('book it') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(pipelineErrors.length).toBeGreaterThanOrEqual(1);
+      expect(pipelineErrors[0]!.error).toContain('tool ctx boom');
+    });
+  });
+
   describe('thread resolution (regression)', () => {
     it('resolves threadTs to msg.threadId when both threadId and account are set', async () => {
       const responses: Record<string, unknown>[] = [];

@@ -118,6 +118,24 @@ export interface ChatPipelineV2Config {
   resolveContextFiles?: (
     ctx: { channelId: string; threadId: string; userId?: string; messageText: string; channel: string },
   ) => Promise<ContextFile[]> | ContextFile[];
+
+  /**
+   * Optional per-turn tool-context resolver. Called once per inbound message
+   * with the resolved conversation coordinates (the same shape passed to
+   * `resolveContextFiles`). The returned fields are merged into the
+   * `ToolContext` handed to every tool handler for that turn — letting an app
+   * thread per-turn identity (e.g. which user the primary agent is acting on
+   * behalf of) into tool execution, which the static config cannot express.
+   *
+   * The base `ToolContext` fields (`taskId`, `agentId`, `hooks`, `db`,
+   * `resolveFilePath`) are applied first and cannot be overridden by the
+   * resolver — returned keys that collide with them are ignored. If the
+   * resolver throws, the error propagates to the turn's try/catch and fails
+   * loudly; there is no silent fallback.
+   */
+  resolveToolContext?: (
+    ctx: { channelId: string; threadId: string; userId?: string; messageText: string; channel: string },
+  ) => Promise<Record<string, unknown>> | Record<string, unknown>;
 }
 
 const DEFAULT_DEDUP_WINDOW_MS = 5 * 60 * 1000;
@@ -261,9 +279,24 @@ export class ChatPipelineV2 {
           if (contextFilesBlock) systemPrompt += `\n\n${contextFilesBlock}`;
         }
 
+        // Per-turn tool context (e.g. which user the primary agent is acting
+        // on behalf of). Merged into every tool handler's ToolContext below.
+        // A thrown resolver propagates to the outer catch and fails the turn
+        // loudly — no silent fallback to an empty context.
+        let toolContextExtra: Record<string, unknown> = {};
+        if (this.config.resolveToolContext) {
+          toolContextExtra = await this.config.resolveToolContext({
+            channelId,
+            threadId: threadTs,
+            userId: msg.from,
+            messageText: msg.body,
+            channel: this.channel,
+          }) ?? {};
+        }
+
         // ── Phase 2: THINK ─────────────────────────────────────
         const { text, tasksDispatched } = await this.think(
-          systemPrompt, history, msg.body, threadTs, channelId, msg.attachmentBlocks,
+          systemPrompt, history, msg.body, threadTs, channelId, msg.attachmentBlocks, toolContextExtra,
         );
 
         // ── Phase 3: RESPOND ───────────────────────────────────
@@ -331,6 +364,7 @@ export class ChatPipelineV2 {
     threadTs: string,
     channelId: string,
     attachmentBlocks?: ContentBlock[],
+    toolContextExtra?: Record<string, unknown>,
   ): Promise<{ text: string; tasksDispatched: string[] }> {
     const model = this.config.model ?? 'claude-sonnet-4-6';
     const maxIterations = this.config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
@@ -383,6 +417,9 @@ export class ChatPipelineV2 {
         if (handler) {
           try {
             const toolCtx: ToolContext = {
+              // Per-turn extras first; base fields applied last so the
+              // resolver can never override taskId/agentId/hooks/db.
+              ...toolContextExtra,
               taskId: '',
               agentId: 'primary',
               hooks: this.hooks,
