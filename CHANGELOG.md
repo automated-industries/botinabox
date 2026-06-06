@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.17] — 2026-06-06
+
+### Added
+
+- **`resolveToolContext` hook on `ChatPipelineV2Config`** — an optional per-turn resolver, called once per inbound message with the same coordinates as `resolveContextFiles` (`{ channelId, threadId, userId?, messageText, channel }`). The fields it returns are merged into the `ToolContext` passed to every tool handler for that turn, letting an app thread per-turn identity (e.g. which user the primary agent is acting on behalf of, resolved from `userId`) into tool execution — something the static config could not express, since the primary agent always runs under `agentId: 'primary'`. Base context fields (`taskId`, `agentId`, `hooks`, `db`, `resolveFilePath`) are applied after the resolver's output and cannot be overridden; colliding keys are ignored. A thrown resolver propagates to the turn's try/catch and surfaces via `pipeline.error` (no silent fallback). Omitting the hook leaves the `ToolContext` byte-identical to before — fully backward-compatible.
+
 ## [2.16.16] — 2026-06-05
 
 ### Added
