@@ -78,26 +78,51 @@ export class SecretStore {
   }
 
   async set(input: SecretInput): Promise<SecretMeta> {
-    const id = uuidv4();
-    const data = { ...input, id };
-    if (this.encKey && data.value) {
-      data.value = encryptValue(data.value, this.encKey);
+    const environment = input.environment ?? "production";
+    const value =
+      this.encKey && input.value
+        ? encryptValue(input.value, this.encKey)
+        : input.value;
+
+    // Upsert: keep exactly one live row per (name, environment). Update the
+    // existing live row when present, else insert. Without this, every set()
+    // inserts a fresh row — so a caller that re-saves the same key on a cycle
+    // (e.g. OAuth token refresh writing `google_tokens:<account>` each rotation)
+    // accumulates unbounded duplicates, and `get()` (LIMIT 1) then returns a
+    // nondeterministic row. See saveCursor() for the same pattern.
+    const existing = await this.db.query("secrets", {
+      where: { name: input.name, environment },
+      filters: [{ col: "deleted_at", op: "isNull" as const }],
+      limit: 1,
+    });
+
+    if (existing.length > 0) {
+      const id = existing[0].id as string;
+      const changes: Record<string, unknown> = {
+        value,
+        environment,
+        updated_at: new Date().toISOString(),
+      };
+      if (input.type !== undefined) changes.type = input.type;
+      if (input.description !== undefined) changes.description = input.description;
+      await this.db.update("secrets", id, changes);
+      await this.hooks.emit("secret.updated", { name: input.name });
+      const updated = await this.db.get("secrets", id);
+      return this._toMeta(updated!);
     }
-    await this.db.insert("secrets", data);
+
+    const id = uuidv4();
+    await this.db.insert("secrets", { ...input, id, value, environment });
     await this.hooks.emit("secret.created", { name: input.name });
     const inserted = await this.db.get("secrets", id);
     return this._toMeta(inserted!);
   }
 
   async get(name: string, environment = "production"): Promise<string | null> {
-    const rows = await this.db.query("secrets", {
-      where: { name, environment },
-      filters: [{ col: "deleted_at", op: "isNull" as const }],
-      limit: 1,
-    });
-    if (rows.length === 0) return null;
+    const row = await this._latestRow(name, environment);
+    if (!row) return null;
     await this.hooks.emit("secret.accessed", { name, environment });
-    const raw = (rows[0].value as string) ?? null;
+    const raw = (row.value as string) ?? null;
     if (raw && this.encKey) return decryptValue(raw, this.encKey);
     return raw;
   }
@@ -106,12 +131,33 @@ export class SecretStore {
     name: string,
     environment = "production",
   ): Promise<SecretMeta | null> {
+    const row = await this._latestRow(name, environment);
+    return row ? this._toMeta(row) : null;
+  }
+
+  /**
+   * Fetch the most recently created live row for (name, environment).
+   *
+   * `set()` keeps this to a single row in steady state, but we still pick the
+   * newest in JS rather than rely on a SQL `LIMIT 1` (nondeterministic without
+   * an ORDER BY) or a dialect/version-specific `orderBy` form: legacy data
+   * written before the upsert fix can still have duplicate live rows, and JS
+   * sorting resolves them deterministically across SQLite and Postgres. (Same
+   * cross-dialect-sort rationale as the chat memory resolver.)
+   */
+  private async _latestRow(
+    name: string,
+    environment: string,
+  ): Promise<Record<string, unknown> | undefined> {
     const rows = await this.db.query("secrets", {
       where: { name, environment },
       filters: [{ col: "deleted_at", op: "isNull" as const }],
-      limit: 1,
     });
-    return rows.length > 0 ? this._toMeta(rows[0]) : null;
+    if (rows.length === 0) return undefined;
+    rows.sort((a, b) =>
+      String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")),
+    );
+    return rows[0];
   }
 
   async list(): Promise<SecretMeta[]> {
