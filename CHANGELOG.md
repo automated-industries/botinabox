@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.18] — 2026-06-06
+
+### Fixed
+
+- **`SecretStore.set` now upserts instead of always inserting.** Previously every `set()` inserted a new row with a fresh id, so a caller that re-saves the same key on a cycle — e.g. the OAuth token refresh writing `google_tokens:<account>` every rotation — accumulated unbounded duplicate live rows (observed: 90 live rows for one key). `set()` now updates the existing live row for `(name, environment)` when present and only inserts when absent, keeping exactly one live row per key. (Consistent with the existing `saveCursor` upsert pattern.)
+- **`SecretStore.get` / `getMeta` are now deterministic.** They previously used `LIMIT 1` with no ordering, so when duplicate live rows existed they returned an arbitrary one. They now select the most recently created live row (sorted in JS for cross-dialect/version stability — same rationale as other newest-wins reads), so legacy pre-upsert duplicates still resolve to the latest secret.
+
 ## [2.16.17] — 2026-06-06
 
 ### Added
