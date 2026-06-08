@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.21] — 2026-06-08
+
+### Changed
+
+- **Bump `latticesql` to 2.0.0.** Lattice 2.0 adds the GUI AI assistant +
+  Context Constructor; its library API is unchanged and fully
+  backwards-compatible, so this is a dependency refresh with no behavior change
+  in `botinabox`. The full test suite passes against 2.0.0.
+
+---
+
 ## [2.16.20] — 2026-06-08
 
 ### Fixed
