@@ -93,11 +93,17 @@ export class DataStore {
       slug: (row: Row) => {
         const val = row[def.slugColumn];
         const raw = val == null ? String(row.id ?? row.name ?? 'unknown') : String(val);
-        // Validate: no path traversal characters
-        if (raw.includes('/') || raw.includes('\\') || raw.includes('..')) {
-          throw new Error(`Invalid slug "${raw}": contains path traversal characters`);
-        }
-        return raw;
+        // Sanitize path-traversal characters instead of throwing. A slug becomes
+        // a filesystem path segment, so neutralize separators and parent-dir
+        // sequences rather than failing the ENTIRE render on a single bad row
+        // (e.g. a contact/memory whose name contains "/"). Slugs already free of
+        // these characters — UUIDs, clean slug columns — are returned unchanged.
+        const safe = raw
+          .replace(/[/\\]/g, '-') // path separators → dash
+          .replace(/\.{2,}/g, '-') // collapse ".."+ (parent-dir traversal) → dash
+          .replace(/^\.+/, '') // drop leading dots (no hidden/relative segments)
+          .trim();
+        return safe.length > 0 ? safe : String(row.id ?? 'unknown');
       },
       directoryRoot: def.directory,
       files: def.files as Record<string, import('latticesql').EntityFileSpec>,
