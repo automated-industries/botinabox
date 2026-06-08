@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.20] — 2026-06-08
+
+### Fixed
+
+- **Entity-context slug sanitization.** `defineEntityContext`'s slug function now
+  sanitizes path-traversal characters (`/`, `\`, `..`, leading dots) into `-`
+  instead of **throwing**. A slug becomes a filesystem path segment, and slugs
+  derived from synced/user data (a contact or record name containing `/`) could
+  contain such characters — previously one bad row threw and failed the *entire*
+  `render()`. Slugs already free of these characters (UUIDs, clean slug columns)
+  are returned unchanged.
+
 ## [2.16.19] — 2026-06-08
 
 ### Added
