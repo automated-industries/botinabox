@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.19] — 2026-06-08
+
+### Added
+
+- **`renderSkipsEmpty` DataStore option** (default `false`), forwarded to
+  latticesql `1.16.5`'s option of the same name. When enabled, `render()` skips
+  both the full-table read and the file write for tables registered without a
+  `render` spec (those compile to a no-op that would only emit an empty
+  `.schema-only/<table>.md`). Default-off preserves the prior behavior. Useful
+  when the database has large tables that aren't rendered to context files.
+
+### Changed
+
+- Bump `latticesql` dependency to `^1.16.5`.
+
 ## [2.16.18] — 2026-06-06
 
 ### Fixed
