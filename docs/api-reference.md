@@ -60,6 +60,7 @@ await db.init();
 | `dbPath` | `string` | — | Path to SQLite database file |
 | `outputDir` | `string` | `'.'` | Root directory for entity context rendering |
 | `wal` | `boolean` | `false` | Enable WAL mode for concurrent reads |
+| `renderSkipsEmpty` | `boolean` | `false` | Forwarded to latticesql: on `render()`, skip the read + write for tables with no render spec (they'd only emit an empty `.schema-only/<table>.md`) |
 | `hooks` | `HookBus` | — | Optional hook bus for observability |
 
 **CRUD Methods:**
