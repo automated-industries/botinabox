@@ -29,10 +29,18 @@ export class DataStore {
     dbPath: string;
     outputDir?: string;
     wal?: boolean;
+    /**
+     * When true, `render()` skips the full-table read + file write for tables
+     * with no render spec (they'd only emit an empty `.schema-only/<table>.md`).
+     * Forwarded to latticesql's `renderSkipsEmpty`. Default false — unchanged
+     * behavior. Useful when the DB has large tables that aren't rendered.
+     */
+    renderSkipsEmpty?: boolean;
     hooks?: HookBus;
   }) {
     this.lattice = new Lattice(opts.dbPath, {
       wal: opts.wal ?? true,
+      renderSkipsEmpty: opts.renderSkipsEmpty ?? false,
     });
     this.outputDir = opts.outputDir;
     this.hooks = opts.hooks;
