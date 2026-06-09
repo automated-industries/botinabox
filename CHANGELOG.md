@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.23] — 2026-06-09
+
+### Changed
+
+- **Bump `latticesql` to 2.1.1.** Lattice 2.1.1 is a GUI-only refinement of the
+  assistant rail (unified activity cards, inline object-link pills) plus a round
+  of GUI fixes; its library API is unchanged and fully backwards-compatible, so
+  this is a dependency refresh with no behavior change in `botinabox`. The full
+  test suite passes against 2.1.1.
+
+---
+
 ## [2.16.22] — 2026-06-08
 
 ### Changed
