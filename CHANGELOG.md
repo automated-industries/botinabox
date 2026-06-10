@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.25] — 2026-06-10
+
+### Changed
+
+- **Bump `latticesql` to 2.2.1.** Lattice 2.2.1 is a hotfix for two 2.2.0
+  team-cloud regressions: composite/`id`-less primary keys no longer crash the
+  row-permission query path, and assistant chats are now isolated per member.
+  `botinabox` uses the stable Lattice core (query/CRUD/render) and none of the
+  affected team-cloud paths, so this is a dependency refresh with no behavior
+  change. Full test suite passes against 2.2.1.
+
+---
+
 ## [2.16.24] — 2026-06-09
 
 ### Changed
