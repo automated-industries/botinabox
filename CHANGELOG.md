@@ -6,6 +6,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.24] — 2026-06-09
+
+### Changed
+
+- **Bump `latticesql` to 2.2.0.** Lattice 2.2 adds row-level permissions for
+  shared team clouds (per-row owner + private/everyone/custom visibility,
+  enforced across the REST API, AI assistant, and hosted sync) and deprecates
+  direct `postgres://` team-cloud connections in favour of the hosted Teams
+  server. `botinabox` uses the stable Lattice core (query/CRUD/render), which
+  is unchanged — this is a dependency refresh with no behavior change in
+  `botinabox`. Note for apps that also use `latticesql`'s Teams API directly:
+  `TeamsClient.upgradeToTeamCloud` is renamed to
+  `TeamsClient.registerCloudOwner` in 2.2. The full test suite passes against
+  2.2.0.
+
+---
+
 ## [2.16.23] — 2026-06-09
 
 ### Changed
