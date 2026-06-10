@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.26] — 2026-06-10
+
+### Changed
+
+- **Bump `latticesql` to 2.2.2.** Lattice 2.2.2 is a team-cloud GUI hotfix:
+  unowned tables no longer leak to other members, drag-and-drop ingest
+  auto-generates a `files.slug` (fixing a Postgres NOT NULL failure), the
+  share indicator recolours without a refresh, the assistant gets the
+  operator's name, and the direct-`postgres://` deprecation warning is now
+  silent. `botinabox` uses the stable Lattice core (none of the affected
+  team-cloud/GUI paths), so this is a dependency refresh with no behavior
+  change. Full test suite passes against 2.2.2.
+
+---
+
 ## [2.16.25] — 2026-06-10
 
 ### Changed
