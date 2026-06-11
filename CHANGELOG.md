@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.27] — 2026-06-10
+
+### Changed
+
+- **Bump `latticesql` to 2.2.3.** Lattice 2.2.3 ships a security/breaking change
+  (a cloud is reachable only through a user-authenticated server — a GUI pointed
+  at a raw `postgres://` cloud is refused), native in-process document parsing
+  (PDF / Office / OpenDocument / EPUB / RTF, dropping the external `markitdown`
+  CLI), and an ingest `name`/`title` NOT NULL fix. `botinabox` uses the stable
+  Lattice core (none of the affected GUI / teams / ingest paths), so this is a
+  dependency refresh with no behavior change. Full test suite (739) passes
+  against 2.2.3; build + typecheck clean.
+
 ## [2.16.26] — 2026-06-10
 
 ### Changed
