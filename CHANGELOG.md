@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.28] — 2026-06-11
+
+### Fixed
+
+- **`ChatPipelineV2.buildHistory` now applies its character budget newest-first.** Previously, when a thread's history exceeded the 16,000-char budget, the builder walked the chronological list from the start and stopped at the budget — keeping the OLDEST messages and silently dropping the NEWEST ones, including the context the model needs for the current turn. The budget is now applied by walking backwards from the newest message (matching `ChatResponder.buildContextWindow`), so truncation drops the oldest messages instead. Regression test: a thread whose total length exceeds the budget retains the newest message and drops the oldest.
+
 ## [2.16.27] — 2026-06-10
 
 ### Changed

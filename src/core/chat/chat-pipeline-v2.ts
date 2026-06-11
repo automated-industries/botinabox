@@ -513,7 +513,12 @@ export class ChatPipelineV2 {
     const maxChars = 16000; // ~4K tokens
     let charCount = 0;
 
-    for (const row of rows) {
+    // Apply the character budget newest-first: walk backwards through the
+    // chronological rows so that when a thread exceeds the budget, the
+    // OLDEST messages are dropped — the newest context is what the model
+    // needs for the current turn.
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i]!;
       const rawBody = row.body as string | undefined;
       if (!rawBody) continue;
 
@@ -545,7 +550,7 @@ export class ChatPipelineV2 {
       if (!includeAssistant && direction !== 'inbound') continue;
       if (charCount + body.length > maxChars) break;
 
-      messages.push({
+      messages.unshift({
         role: direction === 'inbound' ? 'user' : 'assistant',
         content: body,
       });
