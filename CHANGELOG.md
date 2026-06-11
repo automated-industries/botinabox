@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.29] — 2026-06-11
+
+### Changed
+
+- **Bump `latticesql` to 2.3.0.** Lattice 2.3.0 makes the native document parsers
+  (`mammoth`, `unpdf`, `word-extractor`, `fflate`), the `file-type` sniffer, and
+  `@anthropic-ai/sdk` regular dependencies instead of optional ones, so document
+  ingest works on every install instead of silently extracting nothing when an
+  install omits optional dependencies. `botinabox` uses the stable Lattice core
+  (none of the affected ingest/parser paths), so this is a dependency refresh with
+  no behavior change. Full test suite (740) passes.
+
 ## [2.16.28] — 2026-06-11
 
 ### Fixed
