@@ -763,6 +763,63 @@ describe('ChatPipelineV2 — Primary Agent Architecture', () => {
       expect(responses[0]!.threadId).toBe('D_DM_CHANNEL');
     });
 
+    it('truncates history newest-first: drops the oldest messages when over the char budget (regression)', async () => {
+      const allCapturedMessages: Array<Array<{ role: string; content: unknown }>> = [];
+      const llmCall = async (params: { messages: Array<{ role: string; content: unknown }> }) => {
+        allCapturedMessages.push([...params.messages]);
+        return {
+          content: [{ type: 'text', text: 'ok' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        includeSystemContext: false,
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      const threadId = '1776308368.555555';
+
+      // Seed a thread whose total length exceeds the 16,000-char history
+      // budget: four 5,000-char messages (20,000 chars total).
+      const markers = ['OLDEST_MARKER', 'SECOND_MARKER', 'THIRD_MARKER', 'NEWEST_MARKER'];
+      for (let i = 0; i < markers.length; i++) {
+        await db.insert('messages', {
+          channel: 'slack',
+          direction: 'inbound',
+          from_user: 'user-1',
+          body: `${markers[i]} ${'x'.repeat(5000 - markers[i]!.length - 1)}`,
+          thread_id: threadId,
+          created_at: new Date(Date.now() - (markers.length - i) * 60_000).toISOString(),
+        });
+      }
+
+      await hooks.emit('message.inbound', makeMessage('current turn question', {
+        account: 'C_TRUNC',
+        threadId,
+      }) as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // Find the primary think call (the one containing the current message)
+      const thinkCalls = allCapturedMessages.filter(msgs =>
+        msgs.some(m => typeof m.content === 'string' && m.content.includes('current turn question'))
+      );
+      expect(thinkCalls.length).toBeGreaterThanOrEqual(1);
+
+      const allContent = thinkCalls[0]!
+        .map(m => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content)))
+        .join('\n');
+
+      // The newest stored message must survive truncation...
+      expect(allContent).toContain('NEWEST_MARKER');
+      // ...and the budget must be enforced by dropping the OLDEST message.
+      expect(allContent).not.toContain('OLDEST_MARKER');
+    });
+
     it('buildHistory queries by thread_id, not by channel', async () => {
       new ChatPipelineV2(db, hooks, {
         llmCall: mockLlmCallV2(),
