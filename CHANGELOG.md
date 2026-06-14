@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.30] — 2026-06-14
+
+### Changed
+
+- **Bump `latticesql` to ^3.0.0.** Lattice 3.0 is a breaking major: a cloud is now
+  a shared Postgres database secured by real Row-Level Security — each member
+  connects directly as their own scoped, non-superuser role and the previous
+  server / replica / sync model is removed. `botinabox` uses only the stable
+  Lattice core (`new Lattice`, `init`, `upsert`, `get`, `delete`, `query`,
+  `migrate`, `render`), none of the removed surface, so this is a dependency
+  refresh with no behavior change. Full test suite (740) passes against 3.0.0;
+  build + typecheck clean.
+
 ## [2.16.29] — 2026-06-11
 
 ### Changed
