@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.31] — 2026-06-14
+
+### Changed
+
+- **Bump `latticesql` to ^3.2.0.** Lattice 3.2 is a backward-compatible minor:
+  cloud invite/join/RLS/realtime hardening and GUI improvements, with no change to
+  the stable Lattice core `botinabox` depends on (`new Lattice`, `init`, `upsert`,
+  `get`, `delete`, `query`, `migrate`, `render`). Dependency refresh with no
+  behavior change. Full test suite (740) passes against 3.2.0; build + typecheck
+  clean.
+
 ## [2.16.30] — 2026-06-14
 
 ### Changed
