@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.35] — 2026-06-16
+
+### Changed
+
+- **Bump `latticesql` to ^3.3.3.** A cloud-provisioning hotfix in Lattice: an
+  invited member's GUI no longer silently degrades to read-only — the member
+  group now receives the GUI/identity bookkeeping grants + polyfill EXECUTE it
+  needs, and migrated clouds get a `deleted_at` backfill, all on the converge
+  path so existing clouds self-heal. No change to the data-layer API botinabox
+  depends on — a dependency refresh.
+
 ## [2.16.34] — 2026-06-16
 
 ### Changed
