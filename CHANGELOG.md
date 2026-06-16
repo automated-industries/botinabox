@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.34] — 2026-06-16
+
+### Changed
+
+- **Bump `latticesql` to ^3.3.2.** A GUI-layer patch in Lattice: the three
+  per-tab Server-Sent-Event streams are multiplexed onto one WebSocket so a
+  browser tab no longer exhausts the per-host connection limit (the GUI froze
+  with more than one tab open); a cloud member no longer sees junction/link
+  tables listed as objects; and a row shared with nobody reads as private. No
+  change to the data-layer API botinabox depends on — a dependency refresh.
+
 ## [2.16.33] — 2026-06-16
 
 ### Changed
