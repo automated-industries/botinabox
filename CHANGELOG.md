@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.33] — 2026-06-16
+
+### Changed
+
+- **Bump `latticesql` to ^3.3.1.** A GUI-layer patch in Lattice (frame-first
+  rendering so the workspace UI never freezes while loading data, a non-blocking
+  workspace switch, and a bounded realtime-broker teardown). No change to the
+  data-layer API botinabox depends on — a dependency refresh.
+
 ## [2.16.32] — 2026-06-16
 
 ### Changed
