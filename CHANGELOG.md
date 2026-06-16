@@ -6,6 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.32] — 2026-06-16
+
+### Changed
+
+- **Bump `latticesql` to ^3.3.0.** Lattice 3.3 is a backward-compatible minor:
+  assistant Markdown artifacts, self-describing schema (auto column/table
+  definitions + tooltips), seamless de-duplication, workspace branding,
+  first-run onboarding, a unified structured cloud-connection form, a realtime
+  liveness watchdog, an optional per-row payload cap (`maxRowBytes`), and a
+  durable source-key store — with no change to the stable Lattice core
+  `botinabox` depends on (`new Lattice`, `init`, `upsert`, `get`, `delete`,
+  `query`, `migrate`, `render`). Dependency refresh with no behavior change.
+  Full test suite (740) passes against 3.3.0; build + typecheck clean.
+
 ## [2.16.31] — 2026-06-14
 
 ### Changed
