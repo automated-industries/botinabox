@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.36] — 2026-06-17
+
+### Changed
+
+- **Bump `latticesql` to ^3.4.0.** A feature release in Lattice: a self-updating
+  GUI, file loopback (rendered-file edits flow back into the DB), per-viewer
+  rendered cloud context, a fault-isolated cloud converge, full-text search on
+  migrated clouds, and a concurrency-safe machine-local credential store. No
+  change to the data-layer API botinabox depends on — a dependency refresh
+  (typecheck, build, and the full test suite are green against 3.4.0).
+
 ## [2.16.35] — 2026-06-16
 
 ### Changed
