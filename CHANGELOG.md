@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.38] — 2026-06-18
+
+### Changed
+
+- **Bump `latticesql` to ^3.4.2.** A Lattice cloud hotfix: the GUI audit log
+  (undo/redo + version history) is now scoped by row visibility (a member sees only
+  the history of rows they can see), and a joined member now hydrates the owner's
+  entity/render layout from the cloud so its context tree renders fully instead of
+  empty. No change to the data-layer API botinabox depends on — a dependency
+  refresh (typecheck, build, and the full test suite are green against 3.4.2).
+
 ## [2.16.37] — 2026-06-18
 
 ### Changed
