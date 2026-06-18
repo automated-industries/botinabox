@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.39] — 2026-06-18
+
+### Changed
+
+- **Bump `latticesql` to ^3.4.4.** A cloud + GUI fix release: members can add/edit/
+  delete through the assistant, private uploads stay private end-to-end, OAuth wins
+  over an API key (and Clear is authoritative), the open-time render no longer
+  re-renders the whole tree, "share with specific people" batches into one save, and
+  background auto-upgrade activates for real installs. No change to the data-layer API
+  botinabox depends on — a dependency refresh (typecheck, build, and the full test
+  suite are green against 3.4.4).
+
 ## [2.16.38] — 2026-06-18
 
 ### Changed
