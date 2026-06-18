@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.37] — 2026-06-18
+
+### Changed
+
+- **Bump `latticesql` to ^3.4.1.** A security/availability hotfix in Lattice:
+  assistant chats are now strictly per-author on a cloud (could previously leak to
+  other members), the SQLite-compat polyfills no longer abort a member's render,
+  and the background render is per-entity incremental. No change to the data-layer
+  API botinabox depends on — a dependency refresh (typecheck, build, and the full
+  test suite are green against 3.4.1).
+
 ## [2.16.36] — 2026-06-17
 
 ### Changed
