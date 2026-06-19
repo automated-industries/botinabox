@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.42] — 2026-06-19
+
+### Changed
+
+- **Bump `latticesql` to ^3.4.7.** Picks up the GUI fix that makes `lattice gui` a
+  singleton (relaunching reuses the running instance instead of starting a duplicate
+  on a fallback port) plus a backstop against an update-driven reload loop. No change
+  to the data-layer API botinabox depends on — a dependency refresh (typecheck,
+  build, and the full test suite are green against 3.4.7).
+
 ## [2.16.41] — 2026-06-19
 
 ### Changed
