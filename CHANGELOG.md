@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.40] — 2026-06-19
+
+### Changed
+
+- **Bump `latticesql` to ^3.4.5.** A GUI release: a manual "Update available —
+  Upgrade" link next to the version indicator (force-update fallback to the
+  auto-updater), a workspace with no active database can now be deleted (revert to
+  the welcome screen), and the one-to-many `ref:` deprecation warnings were removed.
+  No change to the data-layer API botinabox depends on — a dependency refresh
+  (typecheck, build, and the full test suite are green against 3.4.5).
+
 ## [2.16.39] — 2026-06-18
 
 ### Changed
