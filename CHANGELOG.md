@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.43] — 2026-06-19
+
+### Changed
+
+- **Bump `latticesql` to ^4.0.0** (major). 4.0 keeps the `Lattice` data-layer API
+  botinabox uses stable, and existing databases/configs are migrated forward silently
+  on open, so this is a transparent dependency refresh: typecheck, build, and the full
+  test suite (740 tests) are green against 4.0.0. 4.0 brings module decomposition, a
+  much faster cloud workspace open, and silent backwards-compat auto-upgrade of 3.0+
+  configs/data — none of which changes the surface botinabox depends on.
+
 ## [2.16.42] — 2026-06-19
 
 ### Changed
