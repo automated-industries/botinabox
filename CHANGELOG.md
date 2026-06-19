@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.41] — 2026-06-19
+
+### Changed
+
+- **Bump `latticesql` to ^3.4.6.** A GUI-assistant fix: the assistant can now store
+  a secret/credential via a new write-only `create_secret` tool (encrypted at rest,
+  never able to read existing secret values). No change to the data-layer API
+  botinabox depends on — a dependency refresh (typecheck, build, and the full test
+  suite are green against 3.4.6).
+
 ## [2.16.40] — 2026-06-19
 
 ### Changed
