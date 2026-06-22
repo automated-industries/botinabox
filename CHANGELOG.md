@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.44] — 2026-06-22
+
+### Changed
+
+- Bump `latticesql` to 4.1.0 — the retrieval & data substrate release (retrieval
+  eval/health/benchmark, indexed + hybrid + graph search, governance, declarative
+  computed columns, a fuller query surface, keyless cloud file-byte access) plus
+  GUI render/reverse-sync fixes. Additive — no botinabox API changes.
+
 ## [2.16.43] — 2026-06-19
 
 ### Changed
