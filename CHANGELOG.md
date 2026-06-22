@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.45] — 2026-06-22
+
+### Changed
+
+- Bump `latticesql` to 4.2.0 — the structured-source importer (drop a JSON/`.xlsx`
+  into the assistant chat → schema inference, point-in-time snapshots, read-only
+  views) plus retrieval/egress hardening (bounded reads, a failable retrieval-eval
+  gate, an advisory SLO gate), per-recipient realtime delete-event scoping, and
+  symmetric many-to-many rendering. Additive — no botinabox API changes.
+
 ## [2.16.44] — 2026-06-22
 
 ### Changed
