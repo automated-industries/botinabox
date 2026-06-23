@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.47] — 2026-06-23
+
+### Changed
+
+- Bump `latticesql` to 4.2.2 — render-logic changes now force a one-time full
+  re-render on first open after upgrade (via a render template-version bump), so
+  the 4.2 symmetric many-to-many junction rendering auto-applies to workspaces
+  rendered by an older version. Additive — no botinabox API changes.
+
 ## [2.16.46] — 2026-06-23
 
 ### Changed
