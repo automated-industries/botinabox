@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.46] — 2026-06-23
+
+### Changed
+
+- Bump `latticesql` to 4.2.1 — the local SQLite engine now self-heals a native
+  `better-sqlite3` ABI mismatch (rebuilds for the current Node runtime and retries,
+  silently) instead of crashing on a Node-runtime change. Additive — no botinabox
+  API changes.
+
 ## [2.16.45] — 2026-06-22
 
 ### Changed
