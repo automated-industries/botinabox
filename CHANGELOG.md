@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.51] — 2026-06-25
+
+### Changed
+
+- Bump `latticesql` to `^4.3.3` (patch: opening a 3.x-created Postgres cloud
+  workspace on 4.x no longer aborts with `invalid input syntax for type timestamp
+  with time zone: ""` — the SQLite-compat `strftime` polyfill now returns NULL for
+  empty/invalid time strings instead of casting and throwing). Additive for
+  `botinabox` — no API change; verified (tests, typecheck, build).
+
 ## [2.16.50] — 2026-06-25
 
 ### Changed
