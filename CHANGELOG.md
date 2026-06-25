@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.53] — 2026-06-25
+
+### Changed
+
+- Bump `latticesql` to `^4.3.6` (Postgres diagnostics: a failing query now appends
+  `[lattice-sql] failing statement: <sql>` to its error, so a bare cast error names
+  the query that produced it). Additive for `botinabox` — verified (tests,
+  typecheck, build).
+
 ## [2.16.52] — 2026-06-25
 
 ### Changed
