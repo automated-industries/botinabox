@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.52] — 2026-06-25
+
+### Changed
+
+- Bump `latticesql` to `^4.3.5` (a desktop-only patch — the downloadable app now
+  opens on Windows by falling back to the system browser when the embedded webview
+  host can't start). No library API change vs 4.3.3; `botinabox` is unaffected at
+  runtime. Verified (tests, typecheck, build).
+
 ## [2.16.51] — 2026-06-25
 
 ### Changed
