@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.49] — 2026-06-25
+
+### Changed
+
+- Bump `latticesql` to `^4.3.1` (patch: on-device voice-dictation backend fix,
+  form-element rendering, Files-tree folder-expand persistence, Brain-Graph tab
+  retitle guard, and a macOS `.pkg` download). Additive for `botinabox` — no API
+  change here; the dependency is updated and verified (tests, typecheck, build)
+  against the new patch.
+
 ## [2.16.48] — 2026-06-25
 
 ### Changed
