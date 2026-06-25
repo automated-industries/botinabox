@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.48] — 2026-06-25
+
+### Changed
+
+- Bump `latticesql` to `^4.3.0` (the connectors + inline-HTML-files minor). Additive
+  for `botinabox` — no API change here; the dependency is updated and verified
+  (tests, typecheck, build) against the new minor.
+
 ## [2.16.47] — 2026-06-23
 
 ### Changed
