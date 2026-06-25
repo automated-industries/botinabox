@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.50] — 2026-06-25
+
+### Changed
+
+- Bump `latticesql` to `^4.3.2` (patch: the GUI Files sidebar's source roots are
+  now scoped per-workspace instead of a single machine-global registry, fixing
+  roots leaking across workspaces). Additive for `botinabox` — no API change
+  here; verified (tests, typecheck, build) against the new patch.
+
 ## [2.16.49] — 2026-06-25
 
 ### Changed
