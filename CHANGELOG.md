@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.55] — 2026-06-25
+
+### Changed
+
+- Bump `latticesql` to `^4.3.8` — fault-isolates the open-time data-upgrade pass so a
+  3.x-created cloud whose schema has drifted from 4.x always opens (the `files`
+  reference-model backfill is now self-sufficient — adds its missing target columns
+  before the backfill — and each sentinel-gated data-upgrade step is warned + skipped
+  on failure instead of aborting the open). Additive for `botinabox` — verified
+  (tests, typecheck, build).
+
 ## [2.16.54] — 2026-06-25
 
 ### Changed
