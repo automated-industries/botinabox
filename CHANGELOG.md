@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.54] — 2026-06-25
+
+### Changed
+
+- Bump `latticesql` to `^4.3.7` (the real Postgres-cloud upgrade-blocker fix: the
+  legacy `deleted_at = '' -> NULL` open-time migration is now type-aware, so a cloud
+  whose `deleted_at` is a `timestamptz` column no longer aborts the open on
+  `''::timestamptz`; plus per-table fault isolation). Additive for `botinabox` —
+  verified (tests, typecheck, build).
+
 ## [2.16.53] — 2026-06-25
 
 ### Changed
