@@ -23,7 +23,7 @@ const FILETYPE_MAP: Record<string, AttachmentMediaType> = {
   pdf: "pdf",
 
   // doc
-  gdoc: "doc", docx: "doc", doc: "doc", md: "doc", txt: "doc", rtf: "doc",
+  gdoc: "doc", docx: "doc", doc: "doc", md: "doc", txt: "doc", text: "doc", rtf: "doc",
 
   // excel
   gsheet: "excel", xlsx: "excel", xls: "excel", csv: "excel", tsv: "excel",
