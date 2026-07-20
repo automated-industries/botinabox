@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.57] — 2026-07-20
+
+### Changed
+
+- Bump `latticesql` to **5.0.0** (major). botinabox consumes only the stable `Lattice` data
+  layer (unaffected by 5.0's breaking changes, which were the removed bespoke Jira/Trello
+  connector exports and the retired per-user Anthropic API-key assistant path), so this is a
+  drop-in dependency update — build, typecheck, and the full test suite pass unchanged.
+
 ## [2.16.56] — 2026-07-20
 
 ### Fixed
