@@ -29,6 +29,7 @@ describe("slackFiletypeToMediaType", () => {
     expect(slackFiletypeToMediaType("doc")).toBe("doc");
     expect(slackFiletypeToMediaType("md")).toBe("doc");
     expect(slackFiletypeToMediaType("txt")).toBe("doc");
+    expect(slackFiletypeToMediaType("text")).toBe("doc");
   });
 
   it("maps excel filetypes", () => {

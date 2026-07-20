@@ -7,9 +7,11 @@ import type { AttachmentEnricherMap, EnrichmentContext } from "./types.js";
  * appended to `body`; image/document blocks get stored on `attachmentBlocks`
  * so ChatPipeline can assemble a multimodal user message.
  *
- * Enrichers that throw or return empty arrays fall back to a plain
- * `[Attached: <filename>]` breadcrumb — the LLM still sees the attachment
- * was there, just without content.
+ * Breadcrumb markers in the body distinguish four outcomes:
+ * - `[Attached (content not extracted): <filename>]` — no enricher registered for this type
+ * - `[Attachment could not be read: <filename>]` — enricher threw or returned empty
+ * - `[Attachment content — <filename>]` — text block extracted and follows inline
+ * - `[Attached: <filename>]` — image/document block (multimodal content attached separately)
  */
 export async function enrichAttachments(
   msg: InboundMessage,
@@ -26,26 +28,27 @@ export async function enrichAttachments(
     const label = att.filename ?? att.url ?? att.type;
 
     if (!enricher) {
-      textParts.push(`[Attached: ${label}]`);
+      textParts.push(`[Attached (content not extracted): ${label}]`);
       continue;
     }
 
     let blocks: ContentBlock[];
     try {
       blocks = await enricher(att, ctx);
-    } catch {
-      textParts.push(`[Attached: ${label}]`);
+    } catch (err) {
+      console.warn(`[botinabox] Attachment enricher failed for ${label}:`, err);
+      textParts.push(`[Attachment could not be read: ${label}]`);
       continue;
     }
 
     if (blocks.length === 0) {
-      textParts.push(`[Attached: ${label}]`);
+      textParts.push(`[Attachment could not be read: ${label}]`);
       continue;
     }
 
     for (const block of blocks) {
       if (block.type === "text") {
-        textParts.push(`[Attached: ${label}]\n${block.text}`);
+        textParts.push(`[Attachment content — ${label}]\n${block.text}`);
       } else if (block.type === "image" || block.type === "document") {
         mediaBlocks.push(block);
         textParts.push(`[Attached: ${label}]`);

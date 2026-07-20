@@ -17,8 +17,12 @@ export interface EnrichmentContext {
  * blocks representing it. Text blocks become part of the message body; image
  * and document blocks flow through to the Anthropic provider unchanged.
  *
- * Enrichers throw on failure. The framework catches and falls back to a
- * plain `[Attached: <filename>]` breadcrumb in the message body.
+ * Enrichers throw on failure or return empty arrays when content is not
+ * applicable. The framework distinguishes four outcomes in the message body:
+ * - Text successfully extracted: `[Attachment content — <filename>]` with inline text
+ * - Extraction failed or not applicable: `[Attachment could not be read: <filename>]`
+ * - No enricher registered: `[Attached (content not extracted): <filename>]`
+ * - Image/document blocks: `[Attached: <filename>]` with multimodal block attached
  */
 export type AttachmentEnricher = (
   attachment: Attachment,

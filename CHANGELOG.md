@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.56] — 2026-07-20
+
+### Fixed
+
+- Slack plain-text uploads (filetype `text`) were never enriched because the filetype
+  was missing from the media-type map; now maps `text` to `doc` alongside `txt`, `md`,
+  `docx`, and other document types.
+- Attachment breadcrumbs in message bodies now distinguish three outcomes so LLMs can
+  tell whether content was extracted: `[Attachment content — name]` for extracted text,
+  `[Attachment could not be read: name]` for unreadable/failed-extraction attachments,
+  and `[Attached (content not extracted): name]` for types with no registered enricher.
+  Enricher failures are logged with the `[botinabox]` prefix instead of silently swallowed.
+
 ## [2.16.55] — 2026-06-25
 
 ### Changed

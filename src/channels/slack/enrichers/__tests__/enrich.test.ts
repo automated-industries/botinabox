@@ -38,7 +38,7 @@ describe("enrichAttachments", () => {
     const result = await enrichAttachments(msg, ctx, { pdf: enricher });
 
     expect(result.body).toContain("Original message");
-    expect(result.body).toContain("[Attached: document.pdf]");
+    expect(result.body).toContain("[Attachment content — document.pdf]");
     expect(result.body).toContain("PDF summary content");
     expect(result.attachmentBlocks).toBeUndefined();
     expect(enricher).toHaveBeenCalledWith(msg.attachments![0], ctx);
@@ -104,7 +104,7 @@ describe("enrichAttachments", () => {
     const result = await enrichAttachments(msg, ctx, { image: enricher });
 
     expect(result.body).toContain("Body");
-    expect(result.body).toContain("[Attached: mix.png]\ncaption");
+    expect(result.body).toContain("[Attachment content — mix.png]\ncaption");
     expect(result.body).toContain("[Attached: mix.png]");
     expect(result.attachmentBlocks).toEqual([imageBlock]);
   });
@@ -121,7 +121,7 @@ describe("enrichAttachments", () => {
     const enricher = vi.fn().mockResolvedValue([]);
     const result = await enrichAttachments(msg, ctx, { pdf: enricher });
 
-    expect(result.body).toBe("Message\n\n[Attached: document.pdf]");
+    expect(result.body).toBe("Message\n\n[Attachment could not be read: document.pdf]");
     expect(result.attachmentBlocks).toBeUndefined();
   });
 
@@ -136,7 +136,7 @@ describe("enrichAttachments", () => {
     };
     const result = await enrichAttachments(msg, ctx, {});
 
-    expect(result.body).toBe("Message\n\n[Attached: photo.jpg]");
+    expect(result.body).toBe("Message\n\n[Attached (content not extracted): photo.jpg]");
     expect(result.attachmentBlocks).toBeUndefined();
   });
 
@@ -150,10 +150,13 @@ describe("enrichAttachments", () => {
       receivedAt: new Date().toISOString(),
     };
     const enricher = vi.fn().mockRejectedValue(new Error("Enricher failed"));
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const result = await enrichAttachments(msg, ctx, { pdf: enricher });
 
-    expect(result.body).toBe("Message\n\n[Attached: document.pdf]");
+    expect(result.body).toBe("Message\n\n[Attachment could not be read: document.pdf]");
     expect(result.attachmentBlocks).toBeUndefined();
+    expect(consoleWarnSpy).toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
   });
 
   it("handles multiple attachments sequentially", async () => {
@@ -182,7 +185,7 @@ describe("enrichAttachments", () => {
     });
 
     expect(result.body).toContain("Original");
-    expect(result.body).toContain("[Attached: doc1.pdf]\nPDF content");
+    expect(result.body).toContain("[Attachment content — doc1.pdf]\nPDF content");
     expect(result.body).toContain("[Attached: photo.jpg]");
     expect(result.attachmentBlocks).toEqual([imageBlock]);
     expect(pdfEnricher).toHaveBeenCalledOnce();
@@ -216,7 +219,7 @@ describe("enrichAttachments", () => {
     };
     const result = await enrichAttachments(msg, ctx, {});
 
-    expect(result.body).toBe("Message\n\n[Attached: https://example.com/doc.pdf]");
+    expect(result.body).toBe("Message\n\n[Attached (content not extracted): https://example.com/doc.pdf]");
   });
 
   it("uses type as label when filename and URL are missing", async () => {
@@ -230,7 +233,7 @@ describe("enrichAttachments", () => {
     };
     const result = await enrichAttachments(msg, ctx, {});
 
-    expect(result.body).toBe("Message\n\n[Attached: link]");
+    expect(result.body).toBe("Message\n\n[Attached (content not extracted): link]");
   });
 
   it("handles empty body with a text-block enricher", async () => {
@@ -247,6 +250,85 @@ describe("enrichAttachments", () => {
     ]);
     const result = await enrichAttachments(msg, ctx, { pdf: enricher });
 
-    expect(result.body).toBe("[Attached: doc.pdf]\nContent");
+    expect(result.body).toBe("[Attachment content — doc.pdf]\nContent");
+  });
+
+  it("distinguishes extracted content with [Attachment content — ...] marker", async () => {
+    const msg: InboundMessage = {
+      id: "test-14",
+      channel: "C123",
+      from: "U456",
+      body: "Original message",
+      attachments: [{
+        type: "pdf",
+        filename: "document.pdf",
+        url: "https://example.com/doc.pdf",
+      }],
+      receivedAt: new Date().toISOString(),
+    };
+    const enricher = vi.fn().mockResolvedValue([
+      { type: "text", text: "PDF summary content" } satisfies ContentBlock,
+    ]);
+    const result = await enrichAttachments(msg, ctx, { pdf: enricher });
+
+    expect(result.body).toContain("Original message");
+    expect(result.body).toContain("[Attachment content — document.pdf]");
+    expect(result.body).toContain("PDF summary content");
+    expect(result.attachmentBlocks).toBeUndefined();
+  });
+
+  it("logs enricher failure and uses [Attachment could not be read: ...] marker", async () => {
+    const msg: InboundMessage = {
+      id: "test-15",
+      channel: "C123",
+      from: "U456",
+      body: "Message",
+      attachments: [{ type: "pdf", filename: "document.pdf", url: "https://example.com/doc.pdf" }],
+      receivedAt: new Date().toISOString(),
+    };
+    const testErr = new Error("Enricher failed");
+    const enricher = vi.fn().mockRejectedValue(testErr);
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = await enrichAttachments(msg, ctx, { pdf: enricher });
+
+    expect(result.body).toBe("Message\n\n[Attachment could not be read: document.pdf]");
+    expect(result.attachmentBlocks).toBeUndefined();
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[botinabox] Attachment enricher failed for document.pdf:"),
+      testErr,
+    );
+    consoleWarnSpy.mockRestore();
+  });
+
+  it("uses [Attachment could not be read: ...] marker when enricher returns empty array", async () => {
+    const msg: InboundMessage = {
+      id: "test-16",
+      channel: "C123",
+      from: "U456",
+      body: "Message",
+      attachments: [{ type: "pdf", filename: "document.pdf", url: "https://example.com/doc.pdf" }],
+      receivedAt: new Date().toISOString(),
+    };
+    const enricher = vi.fn().mockResolvedValue([]);
+    const result = await enrichAttachments(msg, ctx, { pdf: enricher });
+
+    expect(result.body).toBe("Message\n\n[Attachment could not be read: document.pdf]");
+    expect(result.attachmentBlocks).toBeUndefined();
+  });
+
+  it("uses [Attached (content not extracted): ...] marker when no matching enricher", async () => {
+    const msg: InboundMessage = {
+      id: "test-17",
+      channel: "C123",
+      from: "U456",
+      body: "Message",
+      attachments: [{ type: "image", filename: "photo.jpg", url: "https://example.com/photo.jpg" }],
+      receivedAt: new Date().toISOString(),
+    };
+    const result = await enrichAttachments(msg, ctx, {});
+
+    expect(result.body).toBe("Message\n\n[Attached (content not extracted): photo.jpg]");
+    expect(result.attachmentBlocks).toBeUndefined();
   });
 });
