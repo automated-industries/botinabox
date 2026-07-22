@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.58] — 2026-07-22
+
+### Changed
+
+- Bump `latticesql` to **5.0.1** (patch). A maintenance release on the 5.0 line —
+  cloud row-security and startup hardening fixes plus data-model tooling
+  improvements in the Lattice layer. botinabox consumes only the stable `Lattice`
+  data layer and is unaffected by the internals, so this is a drop-in dependency
+  update — build, typecheck, and the full test suite pass unchanged.
+
 ## [2.16.57] — 2026-07-20
 
 ### Changed
