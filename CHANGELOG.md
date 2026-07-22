@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.59] — 2026-07-22
+
+### Changed
+
+- Bump `latticesql` to **5.1.0** (minor, additive). The 5.1 Lattice release adds a
+  deterministic data-model planner, traceable rendered context / chat answers, an
+  in-GUI managed-token balance, and frictionless signed macOS desktop auto-update.
+  botinabox consumes only the stable `Lattice` data layer and is unaffected by the
+  GUI/cloud additions, so this is a drop-in dependency update — build, typecheck,
+  and the full 744-test suite pass unchanged.
+
 ## [2.16.58] — 2026-07-22
 
 ### Changed
