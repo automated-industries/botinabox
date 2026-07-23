@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.62] — 2026-07-23
+
+### Changed
+
+- Bump `latticesql` to **5.1.3** (large single-worksheet imports: the row-dedup key is indexed
+  before the load and rows load in bounded, atomic, event-loop-yielding chunks, so a ~10⁵-row sheet
+  imports reliably instead of failing partway and leaving a half-loaded table). Drop-in — no botinabox
+  API change.
+
 ## [2.16.61] — 2026-07-23
 
 ### Changed
