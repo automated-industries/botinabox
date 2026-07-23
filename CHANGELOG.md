@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.61] — 2026-07-23
+
+### Changed
+
+- Bump `latticesql` to **5.1.2** (patch hotfix). The 5.1.2 Lattice release scale-guards messy
+  imports (a large/pathological import surfaces a confirm card instead of silently creating
+  hundreds of tables), keeps the app responsive during post-import processing, keeps non-tabular
+  documents as reference files, and fixes the Windows desktop launch crash — no API-surface change
+  for consumers.
+
 ## [2.16.60] — 2026-07-23
 
 ### Changed
