@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.63] — 2026-07-23
+
+### Changed
+
+- Bump `latticesql` to **5.1.4**. The 5.1.4 Lattice release fixes the desktop auto-update loop
+  (a failed install now fails loud once instead of re-downloading forever, and the installer hands
+  the app to the installing user so the in-place updater can complete), extracts ingested documents
+  in full instead of only the first ~12k characters, returns to the welcome screen after deleting the
+  last workspace, collapses repeated tool-step preambles, timestamps replayed chat messages, hides the
+  stray console/blank window on the Windows desktop build, and drops the Analytics center tab strip.
+  Drop-in — no botinabox API change.
+
 ## [2.16.62] — 2026-07-23
 
 ### Changed
