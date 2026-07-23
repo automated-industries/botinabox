@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.60] — 2026-07-23
+
+### Changed
+
+- Bump `latticesql` to **5.1.1** (patch). The 5.1.1 Lattice release makes structured
+  imports faster and more complete — Word/PowerPoint tables import every row, brand-new
+  datasets import silently (no confirm card), the data model auto-tidies after an import,
+  and a batch of GUI fixes land — with no API-surface change for consumers.
+
 ## [2.16.59] — 2026-07-22
 
 ### Changed
