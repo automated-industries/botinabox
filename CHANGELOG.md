@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.64] — 2026-07-24
+
+### Changed
+
+- Bump `latticesql` to **5.1.5**. The 5.1.5 Lattice release makes the GUI recover from a
+  transient read failure at startup (it used to strand an empty, unusable workspace with no
+  error and no retry — it now surfaces the failure and self-heals), strips sandbox-dead
+  controls (print / pop-out / dialog / submit) out of authored HTML artifacts and says what
+  was removed, fails **closed** on desktop update verification and checks the installer's
+  signing identity, adds an on-demand "Check for updates" with a 30-minute poll, and couples
+  the npm and desktop release channels so they advance together. Drop-in — no botinabox API
+  change.
+
 ## [2.16.63] — 2026-07-23
 
 ### Changed
