@@ -6,6 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.65] — 2026-07-24
+
+### Changed
+
+- Bump `latticesql` to **5.2.0**. The 5.2.0 Lattice release names imported document tables
+  deterministically from the document itself (no more anonymous `table_1` names), renames
+  default-named spreadsheet/JSON sources from their file, and caps derived identifiers to
+  PostgreSQL's length limit; opens a new workspace onto its Welcome dashboard, always fetches
+  and parses a shared link, makes the upper-left logo a reliable "home", and reorganizes the
+  data sidebar; adds sign-in with an account identity service so invited and owned cloud
+  workspaces sync in on their own, plus a managed-workspace mode; and gives the Sources panel
+  a per-item remove control, path de-duplication, and a grid-only Files view, alongside a
+  file-paging chat tool for large documents. Drop-in — no botinabox API change.
+
 ## [2.16.64] — 2026-07-24
 
 ### Changed
