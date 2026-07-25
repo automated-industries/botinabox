@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.66] — 2026-07-25
+
+### Changed
+
+- Bump `latticesql` to **5.2.1**. The 5.2.1 Lattice release is a focused patch: on a cloud
+  workspace, marking a column secret now applies the database mask **before** recording the local
+  redaction flag (so a failed mask can't leave a column shown-masked yet still readable by a member);
+  the data-model planner's one-click **Merge tables** and **De-duplicate rows** actions are wired to
+  their real audited operations instead of reporting "not wired"; **KML / GPX / GeoJSON** files are
+  ingested as text rather than skipped; and the unused parameterized connector modules were removed
+  (the generic MCP connector already covers every provider). Drop-in — no botinabox API change.
+
 ## [2.16.65] — 2026-07-24
 
 ### Changed
