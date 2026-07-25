@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.67] — 2026-07-25
+
+### Changed
+
+- Bump `latticesql` to **5.3.0**. The 5.3.0 Lattice release is the first tranche of a realtime-feedback
+  unification: switching a workspace now shows the same loading figure as first-load, the in-app
+  create-workspace wizard shares the onboarding phase-narrated create-progress (including the cloud
+  migrate step), and a shared motion-token vocabulary makes "working…" cues animate consistently.
+  Drop-in — no botinabox API change.
+
 ## [2.16.66] — 2026-07-25
 
 ### Changed
