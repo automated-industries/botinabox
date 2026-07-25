@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.68] — 2026-07-25
+
+### Changed
+
+- Bump `latticesql` to **5.3.1**. The 5.3.1 Lattice release unifies realtime feedback: all background
+  jobs (file ingestion, etc.) report through one activity-menu background-task tracker with a progress
+  bar, and the assistant's thinking + tool use is shown as an ordered status strip rather than chat
+  messages. Drop-in — no botinabox API change.
+
 ## [2.16.67] — 2026-07-25
 
 ### Changed
@@ -183,7 +192,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 - Bump `latticesql` to `^4.3.3` (patch: opening a 3.x-created Postgres cloud
   workspace on 4.x no longer aborts with `invalid input syntax for type timestamp
-  with time zone: ""` — the SQLite-compat `strftime` polyfill now returns NULL for
+with time zone: ""` — the SQLite-compat `strftime` polyfill now returns NULL for
   empty/invalid time strings instead of casting and throwing). Additive for
   `botinabox` — no API change; verified (tests, typecheck, build).
 
@@ -525,7 +534,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
   sanitizes path-traversal characters (`/`, `\`, `..`, leading dots) into `-`
   instead of **throwing**. A slug becomes a filesystem path segment, and slugs
   derived from synced/user data (a contact or record name containing `/`) could
-  contain such characters — previously one bad row threw and failed the *entire*
+  contain such characters — previously one bad row threw and failed the _entire_
   `render()`. Slugs already free of these characters (UUIDs, clean slug columns)
   are returned unchanged.
 
@@ -633,7 +642,7 @@ No API changes; this is strictly additive event payload + a log line. Downstream
 
 ### Changed
 
-- **Bumped `latticesql` from `^1.13.9` to `^1.13.10`.** Passthrough: latticesql 1.13.10 removes the `@scarf/scarf` install-analytics dependency (it was structurally unable to report direct `npm install` events — Scarf's postinstall reads `scarfSettings.allowTopLevel` from the *consumer's* root manifest, not the dependency's) and replaces it with a passive README tracking pixel + public npm download stats. Net effect for `botinabox`: one fewer transitive dependency and a quieter install (no swallowed Scarf postinstall error). No `botinabox` API changes. (`package.json` was previously left at `2.16.5` on `main` while `2.16.6` shipped to npm via #31; this release reconciles the manifest forward to `2.16.7`.)
+- **Bumped `latticesql` from `^1.13.9` to `^1.13.10`.** Passthrough: latticesql 1.13.10 removes the `@scarf/scarf` install-analytics dependency (it was structurally unable to report direct `npm install` events — Scarf's postinstall reads `scarfSettings.allowTopLevel` from the _consumer's_ root manifest, not the dependency's) and replaces it with a passive README tracking pixel + public npm download stats. Net effect for `botinabox`: one fewer transitive dependency and a quieter install (no swallowed Scarf postinstall error). No `botinabox` API changes. (`package.json` was previously left at `2.16.5` on `main` while `2.16.6` shipped to npm via #31; this release reconciles the manifest forward to `2.16.7`.)
 
 ---
 
@@ -758,11 +767,15 @@ Routine dependency bump to keep `botinabox` aligned with the latest latticesql r
 - Additive minor release. Existing `message.inbound` semantics are unchanged — `message_changed` / `message_deleted` events were already being dropped, so previous consumers see no behavior change. The two new hook events are opt-in.
 - Pattern:
   ```typescript
-  hooks.register('slack.message.changed', async (ctx) => {
-    const { channel, ts, newBody } = ctx as { channel: string; ts: string; newBody: string };
+  hooks.register("slack.message.changed", async (ctx) => {
+    const { channel, ts, newBody } = ctx as {
+      channel: string;
+      ts: string;
+      newBody: string;
+    };
     // mirror the edit into your store
   });
-  hooks.register('slack.message.deleted', async (ctx) => {
+  hooks.register("slack.message.deleted", async (ctx) => {
     const { channel, ts } = ctx as { channel: string; ts: string };
     // soft-delete the row keyed by (channel, ts)
   });
@@ -796,13 +809,13 @@ The underlying engine (LatticeSQL 1.3+) has shipped reward tracking for a while,
 - Additive minor release. Existing tables and call sites are unaffected — both new `TableDefinition` fields are optional and default to off, and `DataStore.reward()` is a new method on the surface. No migrations required for tables you don't opt in.
 - Opt-in pattern:
   ```typescript
-  db.define('memos', {
-    columns: { id: 'TEXT PRIMARY KEY', content: 'TEXT' },
+  db.define("memos", {
+    columns: { id: "TEXT PRIMARY KEY", content: "TEXT" },
     rewardTracking: true,
     // pruneBelow: 0.3,  // optional — leave off until you've observed the score distribution
   });
   // ...later, from any code path that has a usefulness signal:
-  await db.reward('memos', id, { relevance: 0.9, accuracy: 1.0 });
+  await db.reward("memos", id, { relevance: 0.9, accuracy: 1.0 });
   ```
 - `pruneBelow` is intentionally off by default. Setting it above `0` on a freshly-opted-in table will soft-delete every row that has not yet been rewarded.
 
@@ -984,21 +997,25 @@ Only botinabox itself shipped enrichers in 2.8.x — no known public consumers h
 ## [2.7.10] — 2026-04-14
 
 ### Changed
+
 - **`latticesql` bumped to `^1.6.10`** — picks up strftime polyfill.
 
 ## [2.7.9] — 2026-04-14
 
 ### Changed
+
 - **`latticesql` bumped to `^1.6.9`** — picks up json_extract polyfill.
 
 ## [2.7.8] — 2026-04-14
 
 ### Changed
+
 - **`latticesql` bumped to `^1.6.8`** — picks up datetime('now') translation.
 
 ## [2.7.7] — 2026-04-14
 
 ### Changed
+
 - **`latticesql` bumped to `^1.6.7`** — picks up CREATE VIEW IF NOT EXISTS translation.
 
 ## [2.7.6] — 2026-04-14
