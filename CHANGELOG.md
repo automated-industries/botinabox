@@ -6,6 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.69] — 2026-07-26
+
+### Changed
+
+- Bump `latticesql` to **5.4.0**. The 5.4.0 Lattice release adds a Lattice Cloud account model option
+  (a third first-run choice that powers the assistant on pay-as-you-go tokens), humanizes assistant
+  turn errors (a failed turn shows a plain message instead of a raw provider payload, and a genuinely
+  expired Claude connection disconnects so the user reconnects), and adds a read-only data-provenance
+  tool that traces where an object's data came from. Drop-in — no botinabox API change.
+
 ## [2.16.68] — 2026-07-25
 
 ### Changed
