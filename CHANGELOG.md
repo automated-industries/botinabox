@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.70] — 2026-07-28
+
+### Changed
+
+- Bump `latticesql` to **5.5.0**. The 5.5.0 Lattice release makes cloud column masking fail-closed
+  (teammates never hold read on a base table, closing leaks in search, version history, file links,
+  calculated columns, and semantic search), fixes teammate edit/search on affected tables, adds a
+  stop/queue chat composer with a single progress surface, moves files to a FILES sidebar section,
+  and declines large destructive removals (a confirmation flow returns in a later release). Drop-in —
+  no botinabox API change.
+
 ## [2.16.69] — 2026-07-26
 
 ### Changed
