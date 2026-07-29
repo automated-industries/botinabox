@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.71] — 2026-07-29
+
+### Changed
+
+- Bump `latticesql` to **5.6.0**. The 5.6.0 Lattice release makes the product reversible by
+  default: confirmations on undoable actions are removed in favour of a real Undo (including
+  one-click undo for schema changes and bulk changes that undo as a single action), the
+  assistant performs large *reversible* changes at any scale instead of refusing by size
+  (permanent removals still refuse), and spreadsheet import is fully automatic — large
+  multi-sheet workbooks import sheet by sheet with no confirmation card or questions.
+  Drop-in — no botinabox API change.
+
 ## [2.16.70] — 2026-07-28
 
 ### Changed
