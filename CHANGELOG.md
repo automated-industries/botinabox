@@ -6,6 +6,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.72] — 2026-08-01
+
+### Changed
+
+- Bump `latticesql` to **5.7.0**. The 5.7.0 Lattice release makes its browser app optional: a
+  `lattice` command and matching package exports now cover bringing in files, folders, URLs and
+  piped text; importing spreadsheets and JSON; attaching and syncing external databases and MCP
+  servers; creating and deleting workspaces and the databases inside them; editing the schema
+  (nesting one table in another, describing tables and columns); administering a shared
+  workspace; answering the assistant's pending questions; and running a full assistant turn from
+  a terminal. Retrieval settings are declarable in a workspace config file (`fts` opts a table
+  into the full-text index, `embeddings` names the fields to embed and the endpoint that embeds
+  them). On a shared Postgres database, recording who owns each row now happens inside the step
+  that protects the table, in one transaction, instead of a separate step that could report
+  success having recorded nothing; and schema changes on a shared database are owner-only from
+  every entry point rather than only from the browser app. Drop-in — no botinabox API change.
+
+- **Upstream breaking change, not reached by botinabox: `latticesql` no longer exports
+  `backfillOwnership`.** botinabox never called it — the only `latticesql` import anywhere in
+  this package is `Lattice` (plus type-only references) in the data layer — so nothing here
+  changed and no botinabox API moved. It matters only if your own project also imports
+  `latticesql` directly and names that symbol, since a caret range will resolve to 5.7.0: an
+  ESM `import { backfillOwnership } from 'latticesql'` then fails to load the module before
+  your own code runs. The upstream fix is to delete the call — `enableRlsForTable` (and
+  `secureCloud`, which drives it) records ownership itself now.
+
+### Notes
+
+- Unchanged by this release, and newly written down upstream: on a **Postgres** database with
+  row security in force, an upsert of a row that does not exist yet is refused with
+  `new row violates row-level security policy`, because the statement names a conflict target.
+  `DataStore.upsert()` emits that shape, so it inherits the limitation. It does not affect the
+  SQLite persistence this package documents, and it behaves the same way on 5.6.0 — see the
+  `latticesql` 5.7.0 release notes for the full statement and what can be done about it.
+
 ## [2.16.71] — 2026-07-29
 
 ### Changed
