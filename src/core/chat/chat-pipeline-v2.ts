@@ -399,11 +399,19 @@ export class ChatPipelineV2 {
 
       const response = await this.config.llmCall(params as Parameters<ChatPipelineV2Config['llmCall']>[0]);
 
-      // Collect text blocks
+      // Collect text blocks. Successive tool-calling iterations emit distinct
+      // utterances (a narration before the tool call, then the final answer).
+      // Separate them with blank lines so the result reads as paragraphs instead
+      // of concatenated sentences. Discard empty/whitespace-only blocks so they
+      // cannot create runs of blank lines.
       const textBlocks = response.content
         .filter(b => b.type === 'text')
-        .map(b => b.text ?? '');
-      if (textBlocks.length > 0) finalText += textBlocks.join('');
+        .map(b => (b.text ?? '').trim())
+        .filter(text => text.length > 0);
+      if (textBlocks.length > 0) {
+        const blockText = textBlocks.join('\n\n');
+        finalText = finalText.length > 0 ? `${finalText}\n\n${blockText}` : blockText;
+      }
 
       // If no tool use, we're done
       if (response.stop_reason !== 'tool_use') break;

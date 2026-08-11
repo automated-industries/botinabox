@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.73] — 2026-08-11
+
+### Fixed
+
+- Chat pipeline text-block concatenation: assistant text from successive tool-calling iterations is now separated by blank lines instead of being concatenated, improving readability when a model emits narration before a tool call and then a final answer afterward. Affected the `ChatPipelineV2.think()` method text accumulation loop.
+
 ## [2.16.72] — 2026-08-01
 
 ### Changed
