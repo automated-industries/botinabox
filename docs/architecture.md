@@ -410,7 +410,7 @@ resolveContextFiles?: (
 ) => Promise<ContextFile[]> | ContextFile[];
 ```
 
-The engine calls the resolver once per task pickup, wraps each returned file in `<file path="...">...</file>` XML tags via the exported `formatContextFilesBlock()` helper, and inserts the block into the system prompt between the static `buildSystemContext` output and the tool listing. The resolver owns all filesystem and database reads — the engine does no I/O of its own — and thrown errors propagate up to fail the task loudly with no silent fallback. Typical uses: injecting rendered per-agent rules, per-project playbooks, or shared CLAUDE.md-style platform documents into the system prompt without hard-coding them in the engine.
+The engine calls the resolver once per task pickup, wraps each returned file in `<file path="...">...</file>` XML tags via the exported `formatContextFilesBlock()` helper, and inserts the block into the system prompt between the static `buildSystemContext` output and the tool listing. The resolver owns all filesystem and database reads — the engine does no I/O of its own — and thrown errors propagate up to fail the task loudly with no silent fallback. Typical uses: injecting rendered per-agent rules, per-project playbooks, or shared platform-level context documents into the system prompt without hard-coding them in the engine.
 
 **Chat-pipeline equivalent.** `ChatPipelineV2` exposes the same hook on its `ChatPipelineV2Config`, scoped to a conversation turn rather than a task pickup:
 
