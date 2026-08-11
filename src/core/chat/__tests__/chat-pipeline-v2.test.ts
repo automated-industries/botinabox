@@ -718,6 +718,172 @@ describe('ChatPipelineV2 — Primary Agent Architecture', () => {
     });
   });
 
+  describe('text-block separation (regression)', () => {
+    it('separates multiple text blocks within one response with blank lines', async () => {
+      const responses: Record<string, unknown>[] = [];
+      hooks.register('response.ready', (ctx) => { responses.push(ctx); });
+
+      const llmCall = async () => {
+        return {
+          content: [
+            { type: 'text', text: 'First block.' },
+            { type: 'text', text: 'Second block.' },
+            { type: 'text', text: 'Third block.' },
+          ],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 10, output_tokens: 20 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('hello') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(responses.length).toBeGreaterThanOrEqual(1);
+      const text = responses[0]!.text as string;
+      expect(text).toBe('First block.\n\nSecond block.\n\nThird block.');
+    });
+
+    it('separates text from tool calls and final text with blank lines (regression)', async () => {
+      const responses: Record<string, unknown>[] = [];
+      hooks.register('response.ready', (ctx) => { responses.push(ctx); });
+
+      const tool = {
+        definition: {
+          name: 'lookup_record',
+          description: 'Lookup a record',
+          input_schema: { type: 'object', properties: {} },
+        },
+        handler: async () => 'Record found: data here',
+      };
+
+      let callCount = 0;
+      const llmCall = async (params: {
+        system?: string;
+        messages: Array<{ role: string; content: unknown }>;
+        tools?: unknown[];
+      }) => {
+        callCount++;
+        const lastMsg = params.messages[params.messages.length - 1];
+
+        // First call: return text + tool_use
+        if (callCount === 1) {
+          return {
+            content: [
+              { type: 'text', text: 'I\'ll look that up.' },
+              { type: 'tool_use', id: 'tool-1', name: 'lookup_record', input: {} },
+            ],
+            stop_reason: 'tool_use',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          };
+        }
+
+        // Follow-up call after tool result: return final text
+        if (Array.isArray(lastMsg?.content) &&
+            (lastMsg.content as Array<{ type: string }>).some(b => b.type === 'tool_result')) {
+          return {
+            content: [{ type: 'text', text: 'Here is the complete answer.' }],
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 10, output_tokens: 20 },
+          };
+        }
+
+        return {
+          content: [{ type: 'text', text: 'Fallback.' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        tools: [tool],
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('look up something') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(responses.length).toBeGreaterThanOrEqual(1);
+      const text = responses[0]!.text as string;
+      // Should be: "I'll look that up." + blank line + "Here is the complete answer."
+      expect(text).toBe('I\'ll look that up.\n\nHere is the complete answer.');
+      expect(text).not.toContain('I\'ll look that up.Here is the complete answer.');
+    });
+
+    it('drops empty and whitespace-only blocks without creating blank-line artifacts', async () => {
+      const responses: Record<string, unknown>[] = [];
+      hooks.register('response.ready', (ctx) => { responses.push(ctx); });
+
+      const llmCall = async () => {
+        return {
+          content: [
+            { type: 'text', text: 'First.' },
+            { type: 'text', text: '   ' },
+            { type: 'text', text: '' },
+            { type: 'text', text: 'Second.' },
+          ],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 10, output_tokens: 20 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('hello') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(responses.length).toBeGreaterThanOrEqual(1);
+      const text = responses[0]!.text as string;
+      // Should be exactly "First.\n\nSecond." with no leading, trailing, or doubled blank lines
+      expect(text).toBe('First.\n\nSecond.');
+      expect(text).not.toMatch(/^\n/);
+      expect(text).not.toMatch(/\n$/);
+      expect(text).not.toMatch(/\n\n\n/);
+    });
+
+    it('preserves a single text block byte-identical (no added whitespace)', async () => {
+      const responses: Record<string, unknown>[] = [];
+      hooks.register('response.ready', (ctx) => { responses.push(ctx); });
+
+      const llmCall = async () => {
+        return {
+          content: [{ type: 'text', text: 'Single block unchanged.' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 10, output_tokens: 20 },
+        };
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall: llmCall as unknown as ChatPipelineV2Config['llmCall'],
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('hello') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      expect(responses.length).toBeGreaterThanOrEqual(1);
+      const text = responses[0]!.text as string;
+      // Exact equality — no added leading/trailing whitespace
+      expect(text).toBe('Single block unchanged.');
+    });
+  });
+
   describe('thread resolution (regression)', () => {
     it('resolves threadTs to msg.threadId when both threadId and account are set', async () => {
       const responses: Record<string, unknown>[] = [];
