@@ -403,27 +403,37 @@ function extractAttachments(payload: any): EmailAttachment[] {
 
 // ── MIME body extraction ──────────────────────────────────────────
 
+/**
+ * Extract the message body, preferring text/plain. Some senders — and some
+ * mail clients when forwarding — emit HTML-only messages with no text/plain
+ * alternative anywhere in the MIME tree; for those the HTML part is returned
+ * rather than leaving the body silently empty. Callers that need plain text
+ * can detect markup and flatten it.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractPlainTextBody(payload: any): string | undefined {
+  return extractBodyByMime(payload, 'text/plain') ?? extractBodyByMime(payload, 'text/html');
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractBodyByMime(payload: any, mime: string): string | undefined {
   if (!payload) return undefined;
 
   // Single-part message: body is directly on the payload
-  if (payload.mimeType === 'text/plain' && payload.body?.data) {
+  if (payload.mimeType === mime && payload.body?.data) {
     return decodeBase64Url(payload.body.data);
   }
 
-  // Multipart: recurse through parts, prefer text/plain
+  // Multipart: direct children first, then recurse into nested multipart
   if (payload.parts) {
-    // First pass: look for text/plain
     for (const part of payload.parts) {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
+      if (part.mimeType === mime && part.body?.data) {
         return decodeBase64Url(part.body.data);
       }
     }
-    // Second pass: recurse into nested multipart
     for (const part of payload.parts) {
       if (part.mimeType?.startsWith('multipart/')) {
-        const result = extractPlainTextBody(part);
+        const result = extractBodyByMime(part, mime);
         if (result) return result;
       }
     }
