@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.74] — 2026-08-28
+
+### Fixed
+
+- Gmail connector: messages with no `text/plain` part anywhere in the MIME tree (HTML-only
+  senders, and some mail clients' forwards) now fall back to the `text/html` part instead of
+  returning an empty body. Plain text is still preferred whenever both alternatives exist, so
+  existing behavior is unchanged for ordinary mail.
+
 ## [2.16.73] — 2026-08-11
 
 ### Fixed

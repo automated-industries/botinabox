@@ -306,6 +306,89 @@ describe('GoogleGmailConnector', () => {
       });
     });
 
+    it('falls back to the HTML part when a message has no plain-text part', async () => {
+      // Some senders (and some mail clients when forwarding) emit HTML-only
+      // messages with no text/plain alternative anywhere in the MIME tree.
+      // The body must fall back to the HTML part instead of arriving empty.
+      await connector.connect(TEST_CONFIG);
+
+      const html = '<div><p>Your order #12345 total is $42.00.</p></div>';
+      mockGmail.users.messages.list.mockResolvedValue({
+        data: { messages: [{ id: 'html-1' }] },
+      });
+      mockGmail.users.messages.get.mockResolvedValueOnce({
+        data: {
+          id: 'html-1',
+          threadId: 'thread-html-1',
+          snippet: 'Your order',
+          labelIds: ['INBOX'],
+          payload: {
+            mimeType: 'multipart/mixed',
+            headers: [
+              { name: 'From', value: 'orders@example.com' },
+              { name: 'To', value: 'user@example.com' },
+              { name: 'Subject', value: 'Order confirmation' },
+              { name: 'Date', value: 'Mon, 01 Jan 2024 12:00:00 +0000' },
+            ],
+            parts: [
+              {
+                mimeType: 'multipart/alternative',
+                parts: [
+                  {
+                    mimeType: 'text/html',
+                    body: { data: Buffer.from(html).toString('base64url') },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+      mockGmail.users.getProfile.mockResolvedValue({ data: { historyId: '1' } });
+
+      const result = await connector.sync();
+      expect(result.records[0].body).toBe(html);
+    });
+
+    it('still prefers the plain-text part when both alternatives exist', async () => {
+      await connector.connect(TEST_CONFIG);
+
+      mockGmail.users.messages.list.mockResolvedValue({
+        data: { messages: [{ id: 'alt-1' }] },
+      });
+      mockGmail.users.messages.get.mockResolvedValueOnce({
+        data: {
+          id: 'alt-1',
+          threadId: 'thread-alt-1',
+          snippet: 'hello',
+          labelIds: ['INBOX'],
+          payload: {
+            mimeType: 'multipart/alternative',
+            headers: [
+              { name: 'From', value: 'a@example.com' },
+              { name: 'To', value: 'b@example.com' },
+              { name: 'Subject', value: 'Hello' },
+              { name: 'Date', value: 'Mon, 01 Jan 2024 12:00:00 +0000' },
+            ],
+            parts: [
+              {
+                mimeType: 'text/plain',
+                body: { data: Buffer.from('plain body').toString('base64url') },
+              },
+              {
+                mimeType: 'text/html',
+                body: { data: Buffer.from('<p>html body</p>').toString('base64url') },
+              },
+            ],
+          },
+        },
+      });
+      mockGmail.users.getProfile.mockResolvedValue({ data: { historyId: '1' } });
+
+      const result = await connector.sync();
+      expect(result.records[0].body).toBe('plain body');
+    });
+
     it('returns empty attachments array when payload has none', async () => {
       await connector.connect(TEST_CONFIG);
 

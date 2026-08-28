@@ -273,7 +273,7 @@ const email = result.records[0];
 console.log(email.subject);        // 'Meeting notes'
 console.log(email.from.email);     // 'sender@example.com'
 console.log(email.snippet);        // Preview text
-console.log(email.body);           // Full plain text body (if available)
+console.log(email.body);           // Body text (HTML for HTML-only messages)
 ```
 
 ### Incremental sync
@@ -329,7 +329,7 @@ interface EmailRecord {
   bcc: EmailAddress[];
   date: string;            // ISO 8601
   snippet: string;         // Gmail preview text
-  body?: string;           // Full plain text body
+  body?: string;           // Plain-text body; falls back to the HTML part for HTML-only messages
   labels: string[];        // Gmail label IDs (e.g. 'INBOX', 'UNREAD')
   isRead: boolean;
   attachments: EmailAttachment[];
