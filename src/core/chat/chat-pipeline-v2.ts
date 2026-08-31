@@ -324,6 +324,21 @@ export class ChatPipelineV2 {
           messageId,
           error: errMsg,
         });
+        // Tell the user something went wrong. Without this, a pipeline
+        // failure is visible in logs only and the thread just goes quiet.
+        // Best-effort: a delivery failure must not mask the original error.
+        try {
+          await this.responder.sendResponse({
+            text: 'Sorry, something went wrong while handling that message. The error has been logged. Please try again.',
+            channel: this.channel,
+            threadId: threadTs,
+            source: 'primary',
+            skipFilter: true,
+            skipRedundancyCheck: true,
+          });
+        } catch {
+          // Already logged and emitted above; nothing more to do here.
+        }
       }
     });
 
@@ -471,12 +486,26 @@ export class ChatPipelineV2 {
               content: result,
             } as unknown as ContentBlock);
           } catch (err) {
+            // tool_use_id and content are the API-required fields; a block
+            // missing them gets the whole follow-up request rejected, which
+            // would abort the turn. is_error tells the model the tool failed.
             toolResults.push({
               type: 'tool_result',
-              id: toolUse.id!,
-              text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+              tool_use_id: toolUse.id!,
+              content: `Error: ${err instanceof Error ? err.message : String(err)}`,
+              is_error: true,
             } as unknown as ContentBlock);
           }
+        } else {
+          // A tool_use naming an unregistered tool must also produce a
+          // tool_result: the API rejects a follow-up request containing any
+          // unanswered tool_use block.
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: toolUse.id!,
+            content: `Error: no handler registered for tool "${toolUse.name}"`,
+            is_error: true,
+          } as unknown as ContentBlock);
         }
       }
 
