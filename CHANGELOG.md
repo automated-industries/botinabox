@@ -6,6 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ---
 
+## [2.16.75] — 2026-08-31
+
+### Fixed
+
+- Chat pipeline tool loop: a tool handler that threw mid-turn produced a `tool_result` block
+  with the wrong field names (`id`/`text` instead of the API-required `tool_use_id`/`content`),
+  so the follow-up model request was rejected with a 400 and the whole turn aborted with no
+  reply. Error results now use the correct fields and set `is_error: true` so the model knows
+  the tool failed. A `tool_use` naming an unregistered tool now also gets an error
+  `tool_result` instead of leaving the block unanswered, which the API rejects the same way.
+- Chat pipeline errors now send a brief notice to the thread in addition to logging and
+  emitting `pipeline.error`, so a failed turn is no longer silent to the person waiting on a
+  reply.
+
 ## [2.16.74] — 2026-08-28
 
 ### Fixed

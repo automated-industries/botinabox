@@ -1022,4 +1022,139 @@ describe('ChatPipelineV2 — Primary Agent Architecture', () => {
       expect((threadBMsgs[0]!.body as string)).toContain('thread B msg');
     });
   });
+
+  describe('Tool-error handling', () => {
+    it('sends an API-valid tool_result (tool_use_id + content) when a tool handler throws', async () => {
+      const capturedCalls: Array<Array<{ role: string; content: unknown }>> = [];
+      let calls = 0;
+      const llmCall = (async (params: { messages: Array<{ role: string; content: unknown }> }) => {
+        capturedCalls.push(JSON.parse(JSON.stringify(params.messages)));
+        calls++;
+        if (calls === 1) {
+          return {
+            content: [{ type: 'tool_use', id: 'tool-err-1', name: 'boom', input: {} }],
+            stop_reason: 'tool_use',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          };
+        }
+        return {
+          content: [{ type: 'text', text: 'Recovered from the tool error.' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      }) as ChatPipelineV2Config['llmCall'];
+
+      const boomTool = {
+        definition: { name: 'boom', description: 'Always throws', input_schema: { type: 'object', properties: {} } },
+        handler: async () => { throw new Error('kaboom'); },
+      };
+
+      const responses: Record<string, unknown>[] = [];
+      hooks.register('response.ready', (ctx) => { responses.push(ctx); });
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall,
+        systemPrompt: 'Test',
+        tools: [boomTool],
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('trigger the tool') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // The follow-up LLM call must receive the error as an API-valid
+      // tool_result block: tool_use_id and content are required fields, and
+      // a block missing them gets the whole request rejected.
+      expect(capturedCalls.length).toBeGreaterThanOrEqual(2);
+      const followUp = capturedCalls[1]!;
+      const lastMsg = followUp[followUp.length - 1]!;
+      expect(Array.isArray(lastMsg.content)).toBe(true);
+      const block = (lastMsg.content as Array<Record<string, unknown>>).find(b => b.type === 'tool_result');
+      expect(block).toBeDefined();
+      expect(block!.tool_use_id).toBe('tool-err-1');
+      expect(String(block!.content)).toContain('kaboom');
+      expect(block!.is_error).toBe(true);
+
+      // The turn completed instead of aborting.
+      expect(responses.length).toBeGreaterThanOrEqual(1);
+      expect(responses[0]!.text).toContain('Recovered');
+    });
+
+    it('still produces a tool_result when the model names an unregistered tool', async () => {
+      const capturedCalls: Array<Array<{ role: string; content: unknown }>> = [];
+      let calls = 0;
+      const llmCall = (async (params: { messages: Array<{ role: string; content: unknown }> }) => {
+        capturedCalls.push(JSON.parse(JSON.stringify(params.messages)));
+        calls++;
+        if (calls === 1) {
+          return {
+            content: [{ type: 'tool_use', id: 'tool-ghost-1', name: 'ghost', input: {} }],
+            stop_reason: 'tool_use',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          };
+        }
+        return {
+          content: [{ type: 'text', text: 'Done.' }],
+          stop_reason: 'end_turn',
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      }) as ChatPipelineV2Config['llmCall'];
+
+      const realTool = {
+        definition: { name: 'real_tool', description: 'Exists', input_schema: { type: 'object', properties: {} } },
+        handler: async () => 'ok',
+      };
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall,
+        systemPrompt: 'Test',
+        tools: [realTool],
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('call the ghost tool') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // Every tool_use block needs a matching tool_result in the follow-up
+      // request; an unanswered tool_use gets the request rejected too.
+      expect(capturedCalls.length).toBeGreaterThanOrEqual(2);
+      const followUp = capturedCalls[1]!;
+      const lastMsg = followUp[followUp.length - 1]!;
+      const blocks = Array.isArray(lastMsg.content) ? lastMsg.content as Array<Record<string, unknown>> : [];
+      const block = blocks.find(b => b.type === 'tool_result');
+      expect(block).toBeDefined();
+      expect(block!.tool_use_id).toBe('tool-ghost-1');
+      expect(String(block!.content)).toContain('ghost');
+      expect(block!.is_error).toBe(true);
+    });
+
+    it('notifies the thread when the pipeline errors instead of failing silently', async () => {
+      const llmCall = (async () => {
+        throw new Error('upstream API rejected the request');
+      }) as unknown as ChatPipelineV2Config['llmCall'];
+
+      const responses: Record<string, unknown>[] = [];
+      const pipelineErrors: Record<string, unknown>[] = [];
+      hooks.register('response.ready', (ctx) => { responses.push(ctx); });
+      hooks.register('pipeline.error', (ctx) => { pipelineErrors.push(ctx); });
+
+      new ChatPipelineV2(db, hooks, {
+        llmCall,
+        systemPrompt: 'Test',
+        tasks: realTasks,
+        wakeups: realWakeups,
+      });
+
+      await hooks.emit('message.inbound', makeMessage('hello') as unknown as Record<string, unknown>);
+      await waitForAsync();
+
+      // The error is surfaced on the hook bus for observers...
+      expect(pipelineErrors.length).toBe(1);
+      // ...and in the thread, so the user is never left with silence.
+      expect(responses.length).toBe(1);
+      expect(String(responses[0]!.text)).toMatch(/went wrong/i);
+    });
+  });
 });
